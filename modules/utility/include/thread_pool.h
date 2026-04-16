@@ -16,12 +16,12 @@
     do {                                                                                                               \
         type *_a = malloc(sizeof(type));                                                                               \
         *_a      = (type){ __VA_ARGS__ };                                                                              \
-        ThreadPool_Submit(pool, fn, _a);                                                                              \
+        ThreadPool_Submit(pool, fn, _a);                                                                               \
     } while (0)
 
 typedef struct ThreadPool {
-    RingBuffer_pthread_t* workers;
-    Queue_t* tasks;
+    RingBuffer_pthread_t *workers;
+    Queue_t *tasks;
 } ThreadPool_t;
 
 typedef struct ThreadTask {
