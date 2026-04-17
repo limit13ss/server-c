@@ -27,7 +27,13 @@ RB_STRUCT RB_FUNC(Create)(uint32_t capacity) {
     };
 }
 
-void RB_FUNC(Free)(RB_STRUCT *rb) { free(rb->arr); }
+void RB_FUNC(Free)(RB_STRUCT *rb) { 
+    if (rb->arr == NULL) {
+        return;
+    }
+    free(rb->arr);
+    rb->arr = NULL;
+}
 
 bool RB_FUNC(Append)(RB_STRUCT *rb, RB_TYPE value) {
     if (rb->count == rb->capacity) {
