@@ -1,27 +1,26 @@
 #ifndef NAZARK_QUEUE_H
 #define NAZARK_QUEUE_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct Node {
-	void *data;
-	struct Node* next;
+    void *data;
+    struct Node *next;
 } Node_t;
 
 typedef struct Queue {
-	Node_t *head;
-	Node_t *tail;
-	uint64_t length;
+    Node_t *head;
+    Node_t *tail;
+    uint64_t length;
 } Queue_t;
 
 Queue_t Queue_Create(void);
-void Queue_Free(Queue_t* q);
-void Queue_Push(Queue_t* q, void* data);
-bool Queue_Pop(Queue_t* q, void* outData);
-bool Queue_Peek(Queue_t* q, void* outData);
+void Queue_Free(Queue_t *q);
+bool Queue_Push(Queue_t *q, void *data);
+bool Queue_Pop(Queue_t *q, void **outData);
+bool Queue_Peek(Queue_t *q, void **outData);
 
-uint64_t Queue_Length(void);
-bool Queue_IsEmpty(void);
+uint64_t Queue_Length(Queue_t *q);
 
 #endif // NAZARK_QUEUE_H
