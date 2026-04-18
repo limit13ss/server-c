@@ -6,11 +6,14 @@
 
 #include "queue.h"
 
+#ifndef NKRYLOV_RING_BUFFER_PTHREAD_H
+#define NKRYLOV_RING_BUFFER_PTHREAD_H
 #define RB_TYPE pthread_t
 #define RB_TYPE_NAME pthread
 #include "generic_ring_buffer.h"
 #undef RB_TYPE
 #undef RB_TYPE_NAME
+#endif // NKRYLOV_RING_BUFFER_PTHREAD_H
 
 #define SUBMIT_TASK(pool, fn, type, ...)                                                                               \
     do {                                                                                                               \

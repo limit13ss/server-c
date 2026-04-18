@@ -19,7 +19,7 @@ typedef struct {
 
 RB_STRUCT RB_FUNC(Create)(uint32_t capacity) {
     return (RB_STRUCT){ 
-        .arr = malloc(sizeof(RB_TYPE) * capacity),
+        .arr = (RB_TYPE*)(malloc(sizeof(RB_TYPE) * capacity)),
         .head = 0,
         .tail = 0,
         .count = 0,
@@ -140,3 +140,6 @@ uint32_t RB_FUNC(Length)(RB_STRUCT *rb) { return rb->count; }
 
 uint32_t RB_FUNC(Capacity)(RB_STRUCT *rb) { return rb->capacity; }
 
+#undef RB_GUARD
+#undef RB_FUNC
+#undef RB_STRUCT

@@ -2,6 +2,7 @@
 #define NAZARK_QUEUE_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct Node {
 	void *data;
@@ -11,7 +12,16 @@ typedef struct Node {
 typedef struct Queue {
 	Node_t *head;
 	Node_t *tail;
-	uint64_t size;
+	uint64_t length;
 } Queue_t;
+
+Queue_t Queue_Create(void);
+void Queue_Free(Queue_t* q);
+void Queue_Push(Queue_t* q, void* data);
+bool Queue_Pop(Queue_t* q, void* outData);
+bool Queue_Peek(Queue_t* q, void* outData);
+
+uint64_t Queue_Length(void);
+bool Queue_IsEmpty(void);
 
 #endif // NAZARK_QUEUE_H

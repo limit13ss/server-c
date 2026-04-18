@@ -2,11 +2,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifndef NKRYLOV_RING_BUFFER_I32_H
+#define NKRYLOV_RING_BUFFER_I32_H
 #define RB_TYPE int32_t
 #define RB_TYPE_NAME i32
 #include "generic_ring_buffer.h"
 #undef RB_TYPE
 #undef RB_TYPE_NAME
+#endif // NKRYLOV_RING_BUFFER_I32_H
 
 void testCreation(void) {
     uint32_t cap        = 100;

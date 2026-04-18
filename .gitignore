@@ -1,6 +1,6 @@
 bin/*
 test/*
 
-compile-flags.txt
+compile_flags.txt
 
 *.o
