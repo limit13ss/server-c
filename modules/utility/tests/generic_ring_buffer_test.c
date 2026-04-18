@@ -15,8 +15,13 @@ void testCreation(void) {
     uint32_t cap        = 100;
     RingBuffer_i32_t rb = RingBuffer_i32_Create(cap);
 
-    assert(RingBuffer_i32_Capacity(&rb) == cap);
-    assert(RingBuffer_i32_IsEmpty(&rb));
+    uint32_t realCap = 0;
+    bool isEmpty = false;
+
+    assert(RingBuffer_i32_Capacity(&rb, &realCap));
+    assert(realCap == cap);
+    assert(RingBuffer_i32_IsEmpty(&rb, &isEmpty));
+    assert(isEmpty);
 
     RingBuffer_i32_Free(&rb);
 }
@@ -26,14 +31,22 @@ void testAppend(void) {
     RingBuffer_i32_t rb = RingBuffer_i32_Create(cap);
 
     assert(RingBuffer_i32_Append(&rb, 1));
-    assert(RingBuffer_i32_Length(&rb) == 1);
+
+    uint32_t realLength = 0;
+    bool isEmpty = false;
+
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == 1);
 
     RingBuffer_i32_Append(&rb, 2);
     RingBuffer_i32_Append(&rb, 3);
 
     assert(!RingBuffer_i32_Append(&rb, 0));
-    assert(RingBuffer_i32_Length(&rb) == cap);
-    assert(!RingBuffer_i32_IsEmpty(&rb));
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
+
+    assert(RingBuffer_i32_IsEmpty(&rb, &isEmpty));
+    assert(!isEmpty);
 
     for (uint32_t i = 0; i < cap; ++i) {
         int32_t v = 0;
@@ -48,15 +61,21 @@ void testPrepend(void) {
     uint32_t cap        = 3;
     RingBuffer_i32_t rb = RingBuffer_i32_Create(cap);
 
+    uint32_t realLength = 0;
+    bool isEmpty = false;
+
     assert(RingBuffer_i32_Prepend(&rb, 1));
-    assert(RingBuffer_i32_Length(&rb) == 1);
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == 1);
 
     RingBuffer_i32_Prepend(&rb, 2);
     RingBuffer_i32_Prepend(&rb, 3);
 
     assert(!RingBuffer_i32_Prepend(&rb, 0));
-    assert(RingBuffer_i32_Length(&rb) == cap);
-    assert(!RingBuffer_i32_IsEmpty(&rb));
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
+    assert(RingBuffer_i32_IsEmpty(&rb, &isEmpty));
+    assert(!isEmpty);
 
     int32_t v = 0;
     for (uint32_t i = 0; i < cap; ++i) {
@@ -75,7 +94,9 @@ void testPopFirst(void) {
         RingBuffer_i32_Append(&rb, (int32_t)(i + 1));
     }
 
-    assert(RingBuffer_i32_Length(&rb) == cap);
+    uint32_t realLength = 0;
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
 
     int32_t v = 0;
     for (uint32_t i = 0; i < cap; ++i) {
@@ -83,8 +104,11 @@ void testPopFirst(void) {
         assert(v == (int32_t)(i + 1));
     }
 
-    assert(RingBuffer_i32_IsEmpty(&rb));
-    assert(RingBuffer_i32_Length(&rb) == 0);
+    bool isEmpty = false;
+    assert(RingBuffer_i32_IsEmpty(&rb, &isEmpty));
+    assert(isEmpty);
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == 0);
 
     RingBuffer_i32_Free(&rb);
 }
@@ -97,7 +121,9 @@ void testPopLast(void) {
         RingBuffer_i32_Append(&rb, (int32_t)(i + 1));
     }
 
-    assert(RingBuffer_i32_Length(&rb) == cap);
+    uint32_t realLength = 0;
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
 
     int32_t v = 0;
     for (uint32_t i = 0; i < cap; ++i) {
@@ -105,8 +131,11 @@ void testPopLast(void) {
         assert(v == (int32_t)(cap - i));
     }
 
-    assert(RingBuffer_i32_IsEmpty(&rb));
-    assert(RingBuffer_i32_Length(&rb) == 0);
+    bool isEmpty = false;
+    assert(RingBuffer_i32_IsEmpty(&rb, &isEmpty));
+    assert(isEmpty);
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == 0);
 
     RingBuffer_i32_Free(&rb);
 }
@@ -119,7 +148,9 @@ void testGetAt(void) {
         RingBuffer_i32_Append(&rb, (int32_t)(i + 1));
     }
 
-    assert(RingBuffer_i32_Length(&rb) == cap);
+    uint32_t realLength = 0;
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
 
     int32_t v = 0;
 
@@ -131,7 +162,8 @@ void testGetAt(void) {
 
     assert(!RingBuffer_i32_GetAt(&rb, 5, &v));
 
-    assert(RingBuffer_i32_Length(&rb) == cap);
+    assert(RingBuffer_i32_Length(&rb, &realLength));
+    assert(realLength == cap);
 
     RingBuffer_i32_Free(&rb);
 }
