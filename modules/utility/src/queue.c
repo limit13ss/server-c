@@ -2,12 +2,8 @@
 
 #include <stdlib.h>
 
-Queue_t Queue_Create(void) {
-    return (Queue_t){
-        .head   = NULL,
-        .tail   = NULL,
-        .length = 0,
-    };
+Queue_t Queue_Create(void (*deallocator)(void *data)) {
+    return (Queue_t){ .head = NULL, .tail = NULL, .length = 0, .deallocator = deallocator };
 }
 
 void Queue_Free(Queue_t *q) {
@@ -17,7 +13,9 @@ void Queue_Free(Queue_t *q) {
 
     Node_t *cur = q->head;
     while (cur != NULL) {
+        q->deallocator(cur->data);
         free(cur);
+
         cur = cur->next;
     }
 
@@ -55,8 +53,10 @@ bool Queue_Pop(Queue_t *q, void **outData) {
         return false;
     }
 
-    *outData = q->head;
-    q->head  = q->head->next;
+    *outData = q->head->data;
+
+    free(q->head);
+    q->head = q->head->next;
 
     --q->length;
     if (q->length == 0) {
@@ -72,11 +72,8 @@ bool Queue_Peek(Queue_t *q, void **outData) {
         return false;
     }
 
-    *outData = q->head;
+    *outData = q->head->data;
     return true;
 }
 
-uint64_t Queue_Length(Queue_t *q) {
-    return q->length;
-}
-
+uint64_t Queue_Length(Queue_t *q) { return q->length; }

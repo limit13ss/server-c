@@ -13,9 +13,10 @@ typedef struct Queue {
     Node_t *head;
     Node_t *tail;
     uint64_t length;
+    void (*deallocator)(void *data);
 } Queue_t;
 
-Queue_t Queue_Create(void);
+Queue_t Queue_Create(void (*deallocator)(void *data));
 void Queue_Free(Queue_t *q);
 bool Queue_Push(Queue_t *q, void *data);
 bool Queue_Pop(Queue_t *q, void **outData);
