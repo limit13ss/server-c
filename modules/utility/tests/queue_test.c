@@ -70,17 +70,17 @@ void testPop(void) {
     assert(length == 3);
 
     assert(Queue_Pop(&queue, (void **)(&popped)));
-    assert(*popped == u1);
+    assert(popped == &u1);
     assert(Queue_Length(&queue, &length));
     assert(length == 2);
 
     assert(Queue_Pop(&queue, (void **)(&popped)));
-    assert(*popped == u2);
+    assert(popped == &u2);
     assert(Queue_Length(&queue, &length));
     assert(length == 1);
 
     assert(Queue_Pop(&queue, (void **)(&popped)));
-    assert(*popped == u3);
+    assert(popped == &u3);
     assert(Queue_Length(&queue, &length));
     assert(length == 0);
 

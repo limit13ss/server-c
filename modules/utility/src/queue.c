@@ -1,6 +1,5 @@
 #include "queue.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
 Queue_t Queue_Create(void (*deallocator)(void *data)) {
