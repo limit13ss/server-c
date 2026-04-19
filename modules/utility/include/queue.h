@@ -17,11 +17,11 @@ typedef struct Queue {
 } Queue_t;
 
 Queue_t Queue_Create(void (*deallocator)(void *data));
-void Queue_Free(Queue_t *q);
+bool Queue_Free(Queue_t *q);
 bool Queue_Push(Queue_t *q, void *data);
 bool Queue_Pop(Queue_t *q, void **outData);
 bool Queue_Peek(Queue_t *q, void **outData);
 
-uint64_t Queue_Length(Queue_t *q);
+bool Queue_Length(Queue_t *q, uint64_t *out);
 
 #endif // NAZARK_QUEUE_H

@@ -29,4 +29,7 @@ clean:
 	rm -f $(OBJ) $(OUT)/application compile_flags.txt
 
 test-ring-buffer:
-	$(CC) $(CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/generic_ring_buffer_test.c -o $(OUT_TEST)/$@
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/generic_ring_buffer_test.c -o $(OUT_TEST)/$@
+
+test-queue:
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/queue_test.c $(MOD_UTIL_SRC)/queue.c -o $(OUT_TEST)/$@
