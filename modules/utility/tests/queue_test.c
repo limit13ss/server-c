@@ -53,10 +53,61 @@ void testPush(void) {
     Queue_Free(&queue);
 }
 
+void testPop(void) {
+    Queue_t queue = Queue_Create(dataDeallocator);
+
+    uint32_t *popped = NULL;
+    uint64_t length  = 0;
+
+    assert(!Queue_Pop(&queue, (void **)(&popped)));
+
+    uint32_t u1 = 1, u2 = 2, u3 = 3;
+    assert(Queue_Push(&queue, &u1));
+    assert(Queue_Push(&queue, &u2));
+    assert(Queue_Push(&queue, &u3));
+
+    assert(Queue_Length(&queue, &length));
+    assert(length == 3);
+
+    assert(Queue_Pop(&queue, (void **)(&popped)));
+    assert(*popped == u1);
+    assert(Queue_Length(&queue, &length));
+    assert(length == 2);
+
+    assert(Queue_Pop(&queue, (void **)(&popped)));
+    assert(*popped == u2);
+    assert(Queue_Length(&queue, &length));
+    assert(length == 1);
+
+    assert(Queue_Pop(&queue, (void **)(&popped)));
+    assert(*popped == u3);
+    assert(Queue_Length(&queue, &length));
+    assert(length == 0);
+
+    assert(!Queue_Pop(&queue, (void **)(&popped)));
+
+    assert(queue.head == NULL);
+    assert(queue.tail == NULL);
+
+    u1 = 123456;
+    assert(Queue_Push(&queue, &u1));
+
+    Queue_Free(&queue);
+}
+
 int main(void) {
 
+    printf("[TEST:CreateFree -- START]\n");
     testCreateFree();
+    printf("[TEST:CreateFree -- END]\n");
+
+    printf("[TEST:Pop -- START]\n");
     testPush();
+    printf("[TEST:Pop -- END] \n");
+
+    printf("[TEST:Pop -- START]\n");
+    testPop();
+    printf("[TEST:Pop -- END]\n");
 
     printf("All tests passed!\n");
     return 0;

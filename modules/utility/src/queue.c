@@ -1,5 +1,6 @@
 #include "queue.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 Queue_t Queue_Create(void (*deallocator)(void *data)) {
@@ -40,15 +41,15 @@ bool Queue_Push(Queue_t *q, void *data) {
     newNode->data   = data;
     newNode->next   = NULL;
 
-    if (q->head == NULL) {
-        q->head = newNode;
-    }
-
     if (q->tail == NULL) {
         q->tail = newNode;
     } else {
         q->tail->next = newNode;
         q->tail       = newNode;
+    }
+
+    if (q->head == NULL) {
+        q->head = newNode;
     }
 
     ++q->length;
@@ -60,9 +61,9 @@ bool Queue_Pop(Queue_t *q, void **outData) {
         return false;
     }
 
-    *outData = q->head->data;
-
+    *outData     = q->head->data;
     Node_t *next = q->head->next;
+
     free(q->head);
     q->head = next;
 
