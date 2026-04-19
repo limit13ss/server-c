@@ -15,13 +15,6 @@
 #undef RB_TYPE_NAME
 #endif // NKRYLOV_RING_BUFFER_PTHREAD_H
 
-#define SUBMIT_TASK(pool, fn, type, ...)                                                                               \
-    do {                                                                                                               \
-        type *_a = malloc(sizeof(type));                                                                               \
-        *_a      = (type){ __VA_ARGS__ };                                                                              \
-        ThreadPool_Submit(pool, fn, _a);                                                                               \
-    } while (0)
-
 typedef struct ThreadPool {
     RingBuffer_pthread_t *workers;
     Queue_t *tasks;
@@ -31,10 +24,27 @@ typedef struct ThreadTask {
     uint64_t id;
     void (*fn)(void *arg);
     void *arg;
-    struct ThreadTask *next;
 } ThreadTask_t;
 
+void threadTaskDeallocator(void *task) {
+    ThreadTask_t *pTask = (ThreadTask_t *)(task);
+
+    free(pTask->arg);
+    free(pTask);
+}
+
+ThreadPool_t ThreadPool_Create(uint8_t workersCount);
+bool ThreadPool_Start(ThreadPool_t *pool);
+bool ThreadPool_Stop(ThreadPool_t *pool);
 void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);
-ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
+
+#define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                                                                   \
+    do {                                                                                                               \
+        type *_a = malloc(sizeof(type));                                                                               \
+        *_a      = (type){ __VA_ARGS__ };                                                                              \
+        ThreadPool_Submit(pool, fn, _a);                                                                               \
+    } while (0)
+
+bool ThreadPool_Free(ThreadPool_t *pool);
 
 #endif // NAZARK_THREAD_POOL_H
