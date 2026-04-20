@@ -26,14 +26,14 @@ typedef struct ThreadTask {
     void *arg;
 } ThreadTask_t;
 
-void threadTaskDeallocator(void *task) {
+static inline void threadTaskDeallocator(void *task) {
     ThreadTask_t *pTask = (ThreadTask_t *)(task);
 
     free(pTask->arg);
     free(pTask);
 }
 
-ThreadPool_t ThreadPool_Create(uint8_t workersCount);
+bool ThreadPool_Create(ThreadPool_t *outPool, uint8_t workersCount);
 bool ThreadPool_Start(ThreadPool_t *pool);
 bool ThreadPool_Stop(ThreadPool_t *pool);
 void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);

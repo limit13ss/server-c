@@ -1,4 +1,4 @@
-bin/*
+out/*
 test/*
 
 compile_flags.txt

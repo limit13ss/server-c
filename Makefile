@@ -13,14 +13,14 @@ DEBUG_CFLAGS = -g
 
 SRC = $(wildcard $(MOD_HTTP_SRC)/*.c $(MOD_UTIL_SRC)/*.c)
 OBJ = $(SRC:.c=.o)
-OUT = bin
+OUT = out
 OUT_TEST = test
 
 application: $(OBJ)
 	$(CC) $(OBJ) -o $(OUT)/$@
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 compile-flags:
 	echo "$(ALL_CFLAGS)" | tr ' ' '\n' > compile_flags.txt
