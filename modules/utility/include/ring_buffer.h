@@ -12,7 +12,7 @@ typedef struct RingBuffer {
     int32_t capacity;
 } RingBuffer_t;
 
-RingBuffer_t RingBuffer_Create(int32_t capacity);
+RingBuffer_t* RingBuffer_Create(int32_t capacity);
 void RingBuffer_Free(RingBuffer_t *rb);
 
 bool RingBuffer_Append(RingBuffer_t *rb, int32_t value);

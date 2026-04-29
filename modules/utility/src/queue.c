@@ -2,8 +2,26 @@
 
 #include <stdlib.h>
 
-Queue_t Queue_Create(void (*deallocator)(void *data)) {
-    return (Queue_t){ .head = NULL, .tail = NULL, .length = 0, .deallocator = deallocator };
+struct Node {
+    void *data;
+    struct Node *next;
+};
+
+struct Queue {
+    Node_t *head;
+    Node_t *tail;
+    uint64_t length;
+    void (*deallocator)(void *data);
+};
+
+Queue_t* Queue_Create(void (*deallocator)(void *data)) {
+    Queue_t* q = malloc(sizeof(Queue_t));
+    if (q == NULL) {
+        return NULL;
+    }
+
+    *q = (Queue_t){ .head = NULL, .tail = NULL, .length = 0, .deallocator = deallocator };
+    return q;
 }
 
 bool Queue_Free(Queue_t *q) {
@@ -23,10 +41,7 @@ bool Queue_Free(Queue_t *q) {
         free(cur);
         cur = next;
     }
-
-    q->head   = NULL;
-    q->tail   = NULL;
-    q->length = 0;
+    free(q);
 
     return true;
 }

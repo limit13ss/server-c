@@ -2,10 +2,15 @@
 
 #include <stdlib.h>
 
-RingBuffer_t RingBuffer_Create(int32_t capacity) {
-    return (RingBuffer_t){
+RingBuffer_t* RingBuffer_Create(int32_t capacity) {
+    RingBuffer_t *b = malloc(sizeof(int32_t) * (size_t)(capacity));
+    if (b == NULL) {
+        return NULL;
+    }
+    *b = (RingBuffer_t){
         .arr = malloc(sizeof(int32_t) * (unsigned long)capacity), .head = 0, .tail = 0, .count = 0, .capacity = capacity
     };
+    return b;
 }
 
 void RingBuffer_Free(RingBuffer_t *rb) { free(rb->arr); }

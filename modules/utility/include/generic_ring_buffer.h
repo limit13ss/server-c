@@ -17,10 +17,21 @@ typedef struct {
     uint32_t head, tail, count, capacity;
 } RB_STRUCT;
 
-RB_STRUCT RB_FUNC(Create)(uint32_t capacity) {
-    return (RB_STRUCT){
-        .arr = (RB_TYPE *)(malloc(sizeof(RB_TYPE) * capacity)), .head = 0, .tail = 0, .count = 0, .capacity = capacity
-    };
+RB_STRUCT *RB_FUNC(Create)(uint32_t capacity) {
+    RB_STRUCT *rb = malloc(sizeof(RB_STRUCT));
+    if (rb == NULL) {
+        return NULL;
+    }
+
+    RB_TYPE *arr = (RB_TYPE *)(malloc(sizeof(RB_TYPE) * capacity));
+    if (arr == NULL) {
+        free(rb);
+        return NULL;
+    }
+
+    *rb = (RB_STRUCT){ .arr = arr, .head = 0, .tail = 0, .count = 0, .capacity = capacity };
+
+    return rb;
 }
 
 void RB_FUNC(Free)(RB_STRUCT *rb) {
@@ -130,7 +141,7 @@ bool RB_FUNC(GetAt)(RB_STRUCT *rb, uint32_t index, RB_TYPE *out) {
     return true;
 }
 
-bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool* out) {
+bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool *out) {
     if (rb == NULL || rb->arr == NULL) {
         return false;
     }
@@ -139,7 +150,7 @@ bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool* out) {
     return true;
 }
 
-bool RB_FUNC(Length)(RB_STRUCT *rb, uint32_t* out) {
+bool RB_FUNC(Length)(RB_STRUCT *rb, uint32_t *out) {
     if (rb == NULL || rb->arr == NULL) {
         return false;
     }

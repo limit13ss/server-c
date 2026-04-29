@@ -1,27 +1,59 @@
 #include "thread_pool.h"
+#include "queue.h"
 #include <stdlib.h>
 
-bool ThreadPool_Create(ThreadPool_t *outPool, uint8_t workersCount) {
-    if (workersCount == 0 || outPool == NULL) {
+struct ThreadPool {
+    RingBuffer_pthread_t *workers;
+    Queue_t *tasks;
+    pthread_mutex_t mutexQueue;
+    pthread_cond_t condQueue;
+}; 
+
+static inline void threadTaskDeallocator(void *task) {
+    ThreadTask_t *pTask = (ThreadTask_t *)(task);
+
+    free(pTask->arg);
+    free(pTask);
+}
+
+void threadFunction(Queue_t *tasks) {
+    if (tasks == NULL) {
+        return;
+    }
+}
+
+ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
+    if (workersCount == 0) {
         return false;
     }
 
-    RingBuffer_pthread_t *workers = malloc(sizeof(RingBuffer_pthread_t));
+    ThreadPool_t *pool = malloc(sizeof(ThreadPool_t));
+    if (pool == NULL) {
+        return NULL;
+    };
+
+    RingBuffer_pthread_t *workers = RingBuffer_pthread_Create(workersCount);
     if (!workers) {
-        return false;
+        free(pool);
+        return NULL;
     }
 
-    Queue_t *queue = malloc(sizeof(Queue_t));
+    Queue_t *queue = Queue_Create(threadTaskDeallocator);
     if (!queue) {
-        free(workers);
-        return false;
+        RingBuffer_pthread_Free(workers);
+        free(pool);
+        return NULL;
     }
 
-    *workers = RingBuffer_pthread_Create(workersCount);
-    *queue   = Queue_Create(threadTaskDeallocator);
+    pthread_mutex_t mutexQueue;
+    pthread_cond_t condQueue;
 
-    *outPool = (ThreadPool_t){ .workers = workers, .tasks = queue };
-    return true;
+    pthread_mutex_init(&mutexQueue, NULL);
+    pthread_cond_init(&condQueue, NULL);
+
+    *pool = (ThreadPool_t){ .workers = workers, .tasks = queue, .mutexQueue = mutexQueue, .condQueue = condQueue };
+
+    return pool;
 }
 
 bool ThreadPool_Free(ThreadPool_t *pool) {
@@ -36,12 +68,23 @@ bool ThreadPool_Free(ThreadPool_t *pool) {
     }
 
     RingBuffer_pthread_Free(pool->workers);
-    free(pool->workers);
     pool->workers = NULL;
 
     Queue_Free(pool->tasks);
-    free(pool->tasks);
     pool->tasks = NULL;
+
+    pthread_mutex_destroy(&pool->mutexQueue);
+    pthread_cond_destroy(&pool->condQueue);
+
+    free(pool);
+
+    return true;
+}
+
+bool ThreadPool_Start(ThreadPool_t *pool) {
+    if (pool == NULL || pool->workers == NULL || pool->tasks == NULL) {
+        return false;
+    }
 
     return true;
 }

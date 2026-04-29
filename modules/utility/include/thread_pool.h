@@ -4,8 +4,6 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#include "queue.h"
-
 #ifndef NKRYLOV_RING_BUFFER_PTHREAD_H
 #define NKRYLOV_RING_BUFFER_PTHREAD_H
 #define RB_TYPE pthread_t
@@ -15,10 +13,7 @@
 #undef RB_TYPE_NAME
 #endif // NKRYLOV_RING_BUFFER_PTHREAD_H
 
-typedef struct ThreadPool {
-    RingBuffer_pthread_t *workers;
-    Queue_t *tasks;
-} ThreadPool_t;
+typedef struct ThreadPool ThreadPool_t;
 
 typedef struct ThreadTask {
     uint64_t id;
@@ -26,14 +21,9 @@ typedef struct ThreadTask {
     void *arg;
 } ThreadTask_t;
 
-static inline void threadTaskDeallocator(void *task) {
-    ThreadTask_t *pTask = (ThreadTask_t *)(task);
+static inline void threadTaskDeallocator(void *task);
 
-    free(pTask->arg);
-    free(pTask);
-}
-
-bool ThreadPool_Create(ThreadPool_t *outPool, uint8_t workersCount);
+ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
 bool ThreadPool_Start(ThreadPool_t *pool);
 bool ThreadPool_Stop(ThreadPool_t *pool);
 void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);
