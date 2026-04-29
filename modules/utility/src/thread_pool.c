@@ -1,13 +1,16 @@
 #include "thread_pool.h"
 #include "queue.h"
+
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 struct ThreadPool {
     RingBuffer_pthread_t *workers;
     Queue_t *tasks;
     pthread_mutex_t mutexQueue;
     pthread_cond_t condQueue;
-}; 
+};
 
 static inline void threadTaskDeallocator(void *task) {
     ThreadTask_t *pTask = (ThreadTask_t *)(task);
@@ -16,9 +19,22 @@ static inline void threadTaskDeallocator(void *task) {
     free(pTask);
 }
 
-void threadFunction(Queue_t *tasks) {
-    if (tasks == NULL) {
+void threadFunction(Queue_t *tasks, ThreadTask_t *taskPtr, pthread_mutex_t *mutex, pthread_cond_t *cond) {
+    if (tasks == NULL || taskPtr == NULL || mutex == NULL || cond == NULL) {
         return;
+    }
+
+    while (1) {
+        pthread_mutex_lock(mutex);
+        while (!Queue_Pop(tasks, (void *)(&taskPtr))) {
+            printf("[INF] ThreadPool queue is empty...\n");
+            pthread_cond_wait(cond, mutex);
+        }
+        pthread_mutex_unlock(mutex);
+
+        printf("[INF] ThreadTask (id=%lu) -- START\n", taskPtr->id);
+        taskPtr->fn(taskPtr->arg);
+        printf("[INF] ThreadTask (id=%lu) -- END\n", taskPtr->id);
     }
 }
 

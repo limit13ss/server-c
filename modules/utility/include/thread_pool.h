@@ -21,8 +21,6 @@ typedef struct ThreadTask {
     void *arg;
 } ThreadTask_t;
 
-static inline void threadTaskDeallocator(void *task);
-
 ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
 bool ThreadPool_Start(ThreadPool_t *pool);
 bool ThreadPool_Stop(ThreadPool_t *pool);
