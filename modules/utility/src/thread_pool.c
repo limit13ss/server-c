@@ -10,6 +10,7 @@ typedef struct WorkerArg {
     ThreadTask_t *taskPtr;
     pthread_mutex_t *mutexQueue;
     pthread_cond_t *condQueue;
+    bool *isRunning;
 } WorkerArg_t;
 
 #ifndef NKRYLOV_RING_BUFFER_WORKER_ARG
@@ -46,12 +47,13 @@ void *threadFunction(void *arg) {
     ThreadTask_t *taskPtr  = wfArg->taskPtr;
     pthread_mutex_t *mutex = wfArg->mutexQueue;
     pthread_cond_t *cond   = wfArg->condQueue;
+    bool *isRunning        = wfArg->isRunning;
 
     if (tasks == NULL || taskPtr == NULL || mutex == NULL || cond == NULL) {
         return NULL;
     }
 
-    while (1) {
+    while (*isRunning) {
         pthread_mutex_lock(mutex);
         while (!Queue_Pop(tasks, (void *)(&taskPtr))) {
             printf("[INF] ThreadPool queue is empty...\n");
@@ -63,6 +65,8 @@ void *threadFunction(void *arg) {
         taskPtr->fn(taskPtr->arg);
         printf("[INF] ThreadTask (id=%lu) -- END\n", taskPtr->id);
     }
+
+    return NULL;
 }
 
 ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
@@ -113,7 +117,7 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
 }
 
 bool ThreadPool_Free(ThreadPool_t *pool) {
-    if (pool == NULL || pool->workers == NULL || pool->tasks == NULL) {
+    if (pool == NULL) {
         return false;
     }
 
@@ -126,6 +130,7 @@ bool ThreadPool_Free(ThreadPool_t *pool) {
     WorkerArg_t arg;
     while (RingBuffer_WorkerArg_PopFirst(pool->workerArgs, &arg)) {
         free(arg.taskPtr);
+        free(arg.isRunning);
     }
 
     RingBuffer_pthread_Free(pool->workers);
@@ -146,7 +151,7 @@ bool ThreadPool_Free(ThreadPool_t *pool) {
 }
 
 bool ThreadPool_Start(ThreadPool_t *pool) {
-    if (pool == NULL || pool->workers == NULL || pool->tasks == NULL) {
+    if (pool == NULL) {
         return false;
     }
 
@@ -163,15 +168,48 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
     for (size_t i = workersCount; i < workersCapacity; ++i) {
         pthread_t thread;
         ThreadTask_t *threadTask = malloc(sizeof(ThreadTask_t));
-        WorkerArg_t arg          = { .tasksQueue = pool->tasks,
-                                     .mutexQueue = &pool->mutexQueue,
-                                     .condQueue  = &pool->condQueue,
-                                     .taskPtr    = threadTask };
+        bool *isRunning          = malloc(sizeof(bool));
+        *isRunning               = true;
+
+        WorkerArg_t arg = {
+            .tasksQueue = pool->tasks,
+            .mutexQueue = &pool->mutexQueue,
+            .condQueue  = &pool->condQueue,
+            .taskPtr    = threadTask,
+            .isRunning  = isRunning,
+        };
 
         pthread_create(&thread, NULL, &threadFunction, (void *)(&arg));
 
         RingBuffer_pthread_Append(pool->workers, thread);
         RingBuffer_WorkerArg_Append(pool->workerArgs, arg);
+    }
+
+    return true;
+}
+
+bool ThreadPool_Stop(ThreadPool_t *pool) {
+    if (pool == NULL) {
+        return false;
+    }
+
+    uint64_t argsCount = 0;
+    RingBuffer_WorkerArg_Length(pool->workerArgs, &argsCount);
+
+    WorkerArg_t arg;
+    for (size_t i = 0; i < argsCount; ++i) {
+        RingBuffer_WorkerArg_GetAt(pool->workerArgs, i, &arg);
+        *arg.isRunning = false;
+    }
+
+    pthread_t pThread;
+    while (RingBuffer_pthread_PopFirst(pool->workers, &pThread)) {
+        pthread_join(pThread, NULL);
+    }
+
+    while (RingBuffer_WorkerArg_PopFirst(pool->workerArgs, &arg)) {
+        free(arg.taskPtr);
+        free(arg.isRunning);
     }
 
     return true;
