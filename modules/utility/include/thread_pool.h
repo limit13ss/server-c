@@ -24,13 +24,13 @@ typedef struct ThreadTask {
 ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
 bool ThreadPool_Start(ThreadPool_t *pool);
 bool ThreadPool_Stop(ThreadPool_t *pool);
-void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);
+bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);
 
-#define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                                                                   \
-    do {                                                                                                               \
-        type *_a = malloc(sizeof(type));                                                                               \
-        *_a      = (type){ __VA_ARGS__ };                                                                              \
-        ThreadPool_Submit(pool, fn, _a);                                                                               \
+#define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                           \
+    do {                                                                       \
+        type *_a = malloc(sizeof(type));                                       \
+        *_a      = (type){ __VA_ARGS__ };                                      \
+        ThreadPool_Submit(pool, fn, _a);                                       \
     } while (0)
 
 bool ThreadPool_Free(ThreadPool_t *pool);

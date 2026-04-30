@@ -30,6 +30,7 @@ struct ThreadPool {
     pthread_mutex_t mutexQueue;
     pthread_cond_t condQueue;
     bool isRunning;
+    uint64_t currentTaskId;
 };
 
 static inline void threadTaskDeallocator(void *task) {
@@ -40,7 +41,7 @@ static inline void threadTaskDeallocator(void *task) {
 }
 
 void *threadFunction(void *arg) {
-    if (arg == NULL) {
+    if (!arg) {
         return NULL;
     }
 
@@ -51,7 +52,7 @@ void *threadFunction(void *arg) {
     pthread_cond_t *cond   = wfArg->condQueue;
     bool *isRunning        = wfArg->isRunning;
 
-    if (tasks == NULL || taskPtr == NULL || mutex == NULL || cond == NULL) {
+    if (!tasks || !taskPtr || !mutex || !cond) {
         return NULL;
     }
 
@@ -81,7 +82,7 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
     }
 
     ThreadPool_t *pool = malloc(sizeof(ThreadPool_t));
-    if (pool == NULL) {
+    if (!pool) {
         return NULL;
     };
 
@@ -113,18 +114,19 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
     pthread_mutex_init(&mutexQueue, NULL);
     pthread_cond_init(&condQueue, NULL);
 
-    *pool = (ThreadPool_t){ .workers    = workers,
-                            .workerArgs = workerArgs,
-                            .tasks      = queue,
-                            .mutexQueue = mutexQueue,
-                            .condQueue  = condQueue,
-                            .isRunning  = false };
+    *pool = (ThreadPool_t){ .workers       = workers,
+                            .workerArgs    = workerArgs,
+                            .tasks         = queue,
+                            .mutexQueue    = mutexQueue,
+                            .condQueue     = condQueue,
+                            .isRunning     = false,
+                            .currentTaskId = 0 };
 
     return pool;
 }
 
 bool ThreadPool_Free(ThreadPool_t *pool) {
-    if (pool == NULL) {
+    if (!pool) {
         return false;
     }
 
@@ -158,7 +160,7 @@ bool ThreadPool_Free(ThreadPool_t *pool) {
 }
 
 bool ThreadPool_Start(ThreadPool_t *pool) {
-    if (pool == NULL) {
+    if (!pool) {
         return false;
     }
 
@@ -195,7 +197,7 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
 }
 
 bool ThreadPool_Stop(ThreadPool_t *pool) {
-    if (pool == NULL) {
+    if (!pool) {
         return false;
     }
 
@@ -218,4 +220,24 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
     return true;
 }
 
-void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args) {}
+bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args) {
+    if (!pool || !fn) {
+        return false;
+    }
+
+    ThreadTask_t *task = malloc(sizeof(ThreadTask_t));
+    if (!task) {
+        perror("[ERR][ThreadPool] Failed to allocate memory for ThreadTask\n");
+        return false;
+    }
+    *task =
+        (ThreadTask_t){ .id = pool->currentTaskId++, .fn = fn, .arg = args };
+
+    pthread_mutex_lock(&pool->mutexQueue);
+    if (Queue_Push(pool->tasks, task)) {
+        pthread_cond_signal(&pool->condQueue);
+    }
+    pthread_mutex_unlock(&pool->mutexQueue);
+
+    return true;
+}
