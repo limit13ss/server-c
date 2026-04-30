@@ -1,6 +1,7 @@
 #include "thread_pool.h"
 #include "queue.h"
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,6 +29,7 @@ struct ThreadPool {
     Queue_t *tasks;
     pthread_mutex_t mutexQueue;
     pthread_cond_t condQueue;
+    bool isRunning;
 };
 
 static inline void threadTaskDeallocator(void *task) {
@@ -53,13 +55,17 @@ void *threadFunction(void *arg) {
         return NULL;
     }
 
-    while (*isRunning) {
+    while (1) {
         pthread_mutex_lock(mutex);
-        while (!Queue_Pop(tasks, (void *)(&taskPtr))) {
+        while (*isRunning && !Queue_Pop(tasks, (void *)(&taskPtr))) {
             printf("[INF] ThreadPool queue is empty...\n");
             pthread_cond_wait(cond, mutex);
         }
         pthread_mutex_unlock(mutex);
+
+        if (!*isRunning) {
+            break;
+        }
 
         printf("[INF] ThreadTask (id=%lu) -- START\n", taskPtr->id);
         taskPtr->fn(taskPtr->arg);
@@ -111,7 +117,8 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
                             .workerArgs = workerArgs,
                             .tasks      = queue,
                             .mutexQueue = mutexQueue,
-                            .condQueue  = condQueue };
+                            .condQueue  = condQueue,
+                            .isRunning  = false };
 
     return pool;
 }
@@ -165,18 +172,17 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
         return false;
     }
 
+    pool->isRunning = true;
     for (size_t i = workersCount; i < workersCapacity; ++i) {
         pthread_t thread;
         ThreadTask_t *threadTask = malloc(sizeof(ThreadTask_t));
-        bool *isRunning          = malloc(sizeof(bool));
-        *isRunning               = true;
 
         WorkerArg_t arg = {
             .tasksQueue = pool->tasks,
             .mutexQueue = &pool->mutexQueue,
             .condQueue  = &pool->condQueue,
             .taskPtr    = threadTask,
-            .isRunning  = isRunning,
+            .isRunning  = &pool->isRunning,
         };
 
         pthread_create(&thread, NULL, &threadFunction, (void *)(&arg));
@@ -196,21 +202,23 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
     uint64_t argsCount = 0;
     RingBuffer_WorkerArg_Length(pool->workerArgs, &argsCount);
 
-    WorkerArg_t arg;
-    for (size_t i = 0; i < argsCount; ++i) {
-        RingBuffer_WorkerArg_GetAt(pool->workerArgs, i, &arg);
-        *arg.isRunning = false;
-    }
+    pool->isRunning = false;
 
     pthread_t pThread;
     while (RingBuffer_pthread_PopFirst(pool->workers, &pThread)) {
+        pthread_mutex_lock(&pool->mutexQueue);
+        pthread_cond_signal(&pool->condQueue);
+        pthread_mutex_unlock(&pool->mutexQueue);
+
         pthread_join(pThread, NULL);
     }
 
+    WorkerArg_t arg;
     while (RingBuffer_WorkerArg_PopFirst(pool->workerArgs, &arg)) {
         free(arg.taskPtr);
-        free(arg.isRunning);
     }
 
     return true;
 }
+
+void ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args) {}
