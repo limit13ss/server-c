@@ -199,9 +199,6 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
         return false;
     }
 
-    uint64_t argsCount = 0;
-    RingBuffer_WorkerArg_Length(pool->workerArgs, &argsCount);
-
     pool->isRunning = false;
 
     pthread_t pThread;
