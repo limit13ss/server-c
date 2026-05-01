@@ -10,6 +10,7 @@ typedef struct WorkerArg {
     Queue_t *tasksQueue;
     pthread_mutex_t *mutexQueue;
     pthread_cond_t *condQueue;
+    pthread_cond_t *condFree;
     bool _Atomic *isRunning;
 } WorkerArg_t;
 
@@ -26,8 +27,11 @@ struct ThreadPool {
     RingBuffer_pthread_t *workers;
     RingBuffer_WorkerArg_t *workerArgs;
     Queue_t *tasks;
-    pthread_mutex_t mutexQueue;
-    pthread_cond_t condQueue;
+
+    pthread_mutex_t *mutexQueue;
+    pthread_mutex_t *mutexPool;
+    pthread_cond_t *condQueue;
+    pthread_cond_t *condFree;
 
     bool _Atomic isRunning;
     uint64_t currentTaskId;
@@ -36,7 +40,7 @@ struct ThreadPool {
 static inline void threadTaskDeallocator(void *task) {
     ThreadTask_t *pTask = (ThreadTask_t *)(task);
 
-    if (pTask->arg && pTask->isOnHeap) {
+    if (pTask->arg && pTask->isArgOnHeap) {
         free(pTask->arg);
     }
     free(pTask);
@@ -47,29 +51,34 @@ void *threadFunction(void *arg) {
         return NULL;
     }
 
-    WorkerArg_t *wfArg      = (WorkerArg_t *)(arg);
-    Queue_t *tasks          = wfArg->tasksQueue;
-    pthread_mutex_t *mutex  = wfArg->mutexQueue;
-    pthread_cond_t *cond    = wfArg->condQueue;
-    bool _Atomic *isRunning = wfArg->isRunning;
+    WorkerArg_t *wfArg          = (WorkerArg_t *)(arg);
+    Queue_t *tasks              = wfArg->tasksQueue;
+    pthread_mutex_t *mutexQueue = wfArg->mutexQueue;
+    pthread_cond_t *condQueue   = wfArg->condQueue;
+    pthread_cond_t *condFree    = wfArg->condFree;
+    bool _Atomic *isRunning     = wfArg->isRunning;
 
-    if (!tasks || !mutex || !cond) {
+    if (!tasks || !mutexQueue || !condQueue) {
         return NULL;
     }
 
     ThreadTask_t *taskPtr = NULL;
     while (1) {
-        pthread_mutex_lock(mutex);
+        pthread_mutex_lock(mutexQueue);
         while (*isRunning && !Queue_Peek(tasks, (void **)(&taskPtr))) {
-            pthread_cond_wait(cond, mutex);
+            pthread_cond_wait(condQueue, mutexQueue);
         }
 
         if (!*isRunning) {
-            pthread_mutex_unlock(mutex);
+            pthread_mutex_unlock(mutexQueue);
             break;
         }
-        Queue_Pop(tasks, (void **)(&taskPtr));
-        pthread_mutex_unlock(mutex);
+        if (!Queue_Pop(tasks, (void **)(&taskPtr))) {
+            pthread_mutex_unlock(mutexQueue);
+            continue;
+        }
+        pthread_cond_signal(condFree);
+        pthread_mutex_unlock(mutexQueue);
 
         printf("[INF] ThreadTask (id=%lu) -- START\n", taskPtr->id);
         taskPtr->fn(taskPtr->arg);
@@ -111,21 +120,92 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
         return NULL;
     }
 
-    pthread_mutex_t mutexQueue;
-    pthread_cond_t condQueue;
-
-    if (pthread_mutex_init(&mutexQueue, NULL)) {
+    pthread_mutex_t *mutexQueue = malloc(sizeof(pthread_mutex_t));
+    if (!mutexQueue) {
         RingBuffer_pthread_Free(workers);
         RingBuffer_WorkerArg_Free(workerArgs);
         Queue_Free(queue);
         free(pool);
         return NULL;
     }
-    if (pthread_cond_init(&condQueue, NULL)) {
+    pthread_mutex_t *mutexPool = malloc(sizeof(pthread_mutex_t));
+    if (!mutexPool) {
         RingBuffer_pthread_Free(workers);
         RingBuffer_WorkerArg_Free(workerArgs);
         Queue_Free(queue);
-        pthread_mutex_destroy(&mutexQueue);
+        free(mutexQueue);
+        free(pool);
+        return NULL;
+    }
+    pthread_cond_t *condQueue = malloc(sizeof(pthread_cond_t));
+    if (!condQueue) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(pool);
+        return NULL;
+    }
+    pthread_cond_t *condFree = malloc(sizeof(pthread_cond_t));
+    if (!condFree) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(condQueue);
+        free(pool);
+        return NULL;
+    }
+
+    if (pthread_mutex_init(mutexQueue, NULL)) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(condQueue);
+        free(condFree);
+        free(pool);
+        return NULL;
+    }
+    if (pthread_mutex_init(mutexPool, NULL)) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(condQueue);
+        free(condFree);
+        pthread_mutex_destroy(mutexQueue);
+        free(pool);
+        return NULL;
+    }
+    if (pthread_cond_init(condQueue, NULL)) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(condQueue);
+        free(condFree);
+        pthread_mutex_destroy(mutexQueue);
+        pthread_mutex_destroy(mutexPool);
+        free(pool);
+        return NULL;
+    }
+    if (pthread_cond_init(condFree, NULL)) {
+        RingBuffer_pthread_Free(workers);
+        RingBuffer_WorkerArg_Free(workerArgs);
+        Queue_Free(queue);
+        free(mutexQueue);
+        free(mutexPool);
+        free(condQueue);
+        free(condFree);
+        pthread_mutex_destroy(mutexQueue);
+        pthread_mutex_destroy(mutexPool);
+        pthread_cond_destroy(condQueue);
         free(pool);
         return NULL;
     }
@@ -134,26 +214,38 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
                             .workerArgs    = workerArgs,
                             .tasks         = queue,
                             .mutexQueue    = mutexQueue,
+                            .mutexPool     = mutexPool,
                             .condQueue     = condQueue,
+                            .condFree      = condFree,
                             .isRunning     = false,
                             .currentTaskId = 0 };
 
     return pool;
 }
 
-bool ThreadPool_Free(ThreadPool_t *pool) {
+bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted) {
     if (!pool) {
         return false;
     }
 
+    if (pthread_mutex_trylock(pool->mutexPool) != 0) {
+        return false;
+    }
+
+    if (waitTasksCompleted && pool->isRunning) {
+        uint64_t queueLength = 0;
+        pthread_mutex_lock(pool->mutexQueue);
+        while (Queue_Length(pool->tasks, &queueLength) && queueLength != 0) {
+            pthread_cond_wait(pool->condFree, pool->mutexQueue);
+        }
+        pthread_mutex_unlock(pool->mutexQueue);
+    }
+
     pool->isRunning = false;
 
+    pthread_cond_broadcast(pool->condQueue);
     pthread_t pThread;
     while (RingBuffer_pthread_PopFirst(pool->workers, &pThread)) {
-        pthread_mutex_lock(&pool->mutexQueue);
-        pthread_cond_signal(&pool->condQueue);
-        pthread_mutex_unlock(&pool->mutexQueue);
-
         pthread_join(pThread, NULL);
     }
 
@@ -170,10 +262,19 @@ bool ThreadPool_Free(ThreadPool_t *pool) {
     Queue_Free(pool->tasks);
     pool->tasks = NULL;
 
-    pthread_mutex_destroy(&pool->mutexQueue);
-    pthread_cond_destroy(&pool->condQueue);
+    pthread_mutex_destroy(pool->mutexQueue);
+    free(pool->mutexQueue);
+    pthread_cond_destroy(pool->condQueue);
+    free(pool->condQueue);
+    pthread_cond_destroy(pool->condFree);
+    free(pool->condFree);
 
+    pthread_mutex_t *mutexPool = pool->mutexPool;
     free(pool);
+
+    pthread_mutex_unlock(mutexPool);
+    pthread_mutex_destroy(mutexPool);
+    free(mutexPool);
 
     return true;
 }
@@ -183,36 +284,89 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
         return false;
     }
 
-    uint64_t workersCount = 0, workersCapacity = 0;
-    if (!RingBuffer_pthread_Capacity(pool->workers, &workersCapacity)) {
+    if (pthread_mutex_trylock(pool->mutexPool) != 0) {
         return false;
     }
 
+    uint64_t workersCapacity = 0;
+    if (!RingBuffer_pthread_Capacity(pool->workers, &workersCapacity)) {
+        goto unlockMutexReturnFalse;
+    }
+
+    uint64_t workersCount = 0;
     if (!RingBuffer_pthread_Length(pool->workers, &workersCount) ||
         workersCount != 0) {
-        return false;
+        goto unlockMutexReturnFalse;
+    }
+
+    uint64_t createdThreadsCount = 0;
+    bool needRollback            = false;
+    pthread_t *threads           = malloc(sizeof(pthread_t) * workersCapacity);
+    if (!threads) {
+        goto unlockMutexReturnFalse;
     }
 
     pool->isRunning = true;
-    for (size_t i = workersCount; i < workersCapacity; ++i) {
+    for (size_t i = 0; i < workersCapacity; ++i) {
         pthread_t thread;
 
         WorkerArg_t arg = {
             .tasksQueue = pool->tasks,
-            .mutexQueue = &pool->mutexQueue,
-            .condQueue  = &pool->condQueue,
+            .mutexQueue = pool->mutexQueue,
+            .condQueue  = pool->condQueue,
+            .condFree   = pool->condFree,
             .isRunning  = &pool->isRunning,
         };
+        WorkerArg_t *argPtr;
 
-        RingBuffer_WorkerArg_Append(pool->workerArgs, arg);
-        RingBuffer_WorkerArg_PeekLast(pool->workerArgs, &arg);
+        if (!RingBuffer_WorkerArg_Append(pool->workerArgs, arg)) {
+            needRollback = true;
+            break;
+        }
+        if (!RingBuffer_WorkerArg_PeekLast(pool->workerArgs, &argPtr)) {
+            needRollback = true;
+            break;
+        }
 
-        pthread_create(&thread, NULL, &threadFunction, (void *)(&arg));
+        if (pthread_create(&thread, NULL, &threadFunction, (void *)(argPtr)) !=
+            0) {
+            needRollback = true;
+            break;
+        }
 
-        RingBuffer_pthread_Append(pool->workers, thread);
+        threads[createdThreadsCount] = thread;
+        ++createdThreadsCount;
+
+        if (!RingBuffer_pthread_Append(pool->workers, thread)) {
+            needRollback = true;
+            break;
+        }
     }
 
-    return true;
+    if (needRollback) {
+        pool->isRunning = false;
+        pthread_cond_broadcast(pool->condQueue);
+        for (size_t i = 0; i < createdThreadsCount; ++i) {
+            pthread_join(threads[i], NULL);
+        }
+
+        pthread_t thread;
+        while (RingBuffer_pthread_PopFirst(pool->workers, &thread))
+            ;
+
+        WorkerArg_t arg;
+        while (RingBuffer_WorkerArg_PopFirst(pool->workerArgs, &arg))
+            ;
+    }
+
+    free(threads);
+    pthread_mutex_unlock(pool->mutexPool);
+
+    return !needRollback;
+
+unlockMutexReturnFalse:
+    pthread_mutex_unlock(pool->mutexPool);
+    return false;
 }
 
 bool ThreadPool_Stop(ThreadPool_t *pool) {
@@ -220,14 +374,15 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
         return false;
     }
 
+    if (pthread_mutex_trylock(pool->mutexPool) != 0) {
+        return false;
+    }
+
     pool->isRunning = false;
 
+    pthread_cond_broadcast(pool->condQueue);
     pthread_t pThread;
     while (RingBuffer_pthread_PopFirst(pool->workers, &pThread)) {
-        pthread_mutex_lock(&pool->mutexQueue);
-        pthread_cond_signal(&pool->condQueue);
-        pthread_mutex_unlock(&pool->mutexQueue);
-
         pthread_join(pThread, NULL);
     }
 
@@ -235,6 +390,7 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
     while (RingBuffer_WorkerArg_PopFirst(pool->workerArgs, &arg))
         ;
 
+    pthread_mutex_unlock(pool->mutexPool);
     return true;
 }
 
@@ -250,19 +406,20 @@ bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args,
         return false;
     }
 
-    pthread_mutex_lock(&pool->mutexQueue);
-    *task = (ThreadTask_t){ .id       = pool->currentTaskId++,
-                            .fn       = fn,
-                            .arg      = args,
-                            .isOnHeap = isArgOnHeap };
+    pthread_mutex_lock(pool->mutexQueue);
+    *task = (ThreadTask_t){ .id          = pool->currentTaskId++,
+                            .fn          = fn,
+                            .arg         = args,
+                            .isArgOnHeap = isArgOnHeap };
 
     bool isSuccess = Queue_Push(pool->tasks, task);
     if (isSuccess) {
-        pthread_cond_signal(&pool->condQueue);
+        pthread_cond_signal(pool->condQueue);
     } else {
         free(task);
     }
-    pthread_mutex_unlock(&pool->mutexQueue);
+
+    pthread_mutex_unlock(pool->mutexQueue);
 
     return isSuccess;
 }

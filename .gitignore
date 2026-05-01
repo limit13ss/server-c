@@ -4,3 +4,4 @@ test/*
 compile_flags.txt
 
 *.o
+*.txt

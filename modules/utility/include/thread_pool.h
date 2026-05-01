@@ -2,7 +2,9 @@
 #define NAZARK_THREAD_POOL_H
 
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #ifndef NKRYLOV_RING_BUFFER_PTHREAD_H
 #define NKRYLOV_RING_BUFFER_PTHREAD_H
@@ -19,20 +21,23 @@ typedef struct ThreadTask {
     uint64_t id;
     void (*fn)(void *arg);
     void *arg;
+    bool isArgOnHeap;
 } ThreadTask_t;
 
 ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
+bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted);
 bool ThreadPool_Start(ThreadPool_t *pool);
 bool ThreadPool_Stop(ThreadPool_t *pool);
-bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args);
+bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args,
+                       bool isArgOnHeap);
 
 #define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                           \
     do {                                                                       \
         type *_a = malloc(sizeof(type));                                       \
         *_a      = (type){ __VA_ARGS__ };                                      \
-        ThreadPool_Submit(pool, fn, _a);                                       \
+        if (!ThreadPool_Submit(pool, fn, _a, true)) {                          \
+            free(_a);                                                          \
+        }                                                                      \
     } while (0)
-
-bool ThreadPool_Free(ThreadPool_t *pool);
 
 #endif // NAZARK_THREAD_POOL_H

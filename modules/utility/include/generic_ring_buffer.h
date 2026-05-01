@@ -74,15 +74,15 @@ bool RB_FUNC(Prepend)(RB_STRUCT *rb, RB_TYPE value) {
     return true;
 }
 
-bool RB_FUNC(PeekFirst)(RB_STRUCT *rb, RB_TYPE *out) {
+bool RB_FUNC(PeekFirst)(RB_STRUCT *rb, RB_TYPE **out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
-    *out = rb->arr[rb->head];
+    *out = &(rb->arr[rb->head]);
     return true;
 }
 
-bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE *out) {
+bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE **out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
@@ -93,7 +93,7 @@ bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE *out) {
     } else {
         idx = rb->tail - 1;
     }
-    *out = rb->arr[idx];
+    *out = &(rb->arr[idx]);
 
     return true;
 }
