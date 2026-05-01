@@ -93,40 +93,49 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
         return NULL;
     }
 
-    ThreadPool_t *pool = malloc(sizeof(ThreadPool_t));
+    ThreadPool_t *pool;
+    RingBuffer_pthread_t *workers;
+    RingBuffer_WorkerArg_t *workerArgs;
+    Queue_t *queue;
+    pthread_mutex_t *mutexQueue, *mutexPool;
+    pthread_cond_t *condQueue, *condFree;
+
+    pool = malloc(sizeof(ThreadPool_t));
     if (!pool) {
-        return NULL;
+        goto errPool;
     };
 
-    RingBuffer_pthread_t *workers = RingBuffer_pthread_Create(workersCount);
+    workers = RingBuffer_pthread_Create(workersCount);
     if (!workers) {
         goto errWorkers;
     }
 
-    RingBuffer_WorkerArg_t *workerArgs =
-        RingBuffer_WorkerArg_Create(workersCount);
+    workerArgs = RingBuffer_WorkerArg_Create(workersCount);
     if (!workerArgs) {
         goto errWorkerArgs;
     }
 
-    Queue_t *queue = Queue_Create(threadTaskDeallocator);
+    queue = Queue_Create(threadTaskDeallocator);
     if (!queue) {
         goto errQueue;
     }
 
-    pthread_mutex_t *mutexQueue = malloc(sizeof(pthread_mutex_t));
+    mutexQueue = malloc(sizeof(pthread_mutex_t));
     if (!mutexQueue) {
         goto errMutexQueue;
     }
-    pthread_mutex_t *mutexPool = malloc(sizeof(pthread_mutex_t));
+
+    mutexPool = malloc(sizeof(pthread_mutex_t));
     if (!mutexPool) {
         goto errMutexPool;
     }
-    pthread_cond_t *condQueue = malloc(sizeof(pthread_cond_t));
+
+    condQueue = malloc(sizeof(pthread_cond_t));
     if (!condQueue) {
         goto errCondQueue;
     }
-    pthread_cond_t *condFree = malloc(sizeof(pthread_cond_t));
+
+    condFree = malloc(sizeof(pthread_cond_t));
     if (!condFree) {
         goto errCondFree;
     }
@@ -178,6 +187,7 @@ errWorkerArgs:
     RingBuffer_pthread_Free(workers);
 errWorkers:
     free(pool);
+errPool:
     return NULL;
 }
 
