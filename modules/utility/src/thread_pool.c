@@ -2,20 +2,29 @@
 #include "queue.h"
 
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+typedef struct PoolState {
+    bool _Atomic isRunning;
+    uint64_t _Atomic tasksScheduled;
+    uint64_t _Atomic tasksStarted;
+    uint64_t _Atomic tasksFinished;
+    uint64_t _Atomic currentTaskId;
+} PoolState_t;
 
 typedef struct WorkerArg {
     Queue_t *tasksQueue;
     pthread_mutex_t *mutexQueue;
     pthread_cond_t *condQueue;
     pthread_cond_t *condFree;
-    bool _Atomic *isRunning;
+    PoolState_t *poolState;
 } WorkerArg_t;
 
-#ifndef NKRYLOV_RING_BUFFER_WORKER_ARG
-#define NKRYLOV_RING_BUFFER_WORKER_ARG
+#ifndef NKRYLOV_RING_BUFFER_WORKER_ARG_H
+#define NKRYLOV_RING_BUFFER_WORKER_ARG_H
 #define RB_TYPE WorkerArg_t
 #define RB_TYPE_NAME WorkerArg
 #include "generic_ring_buffer.h"
@@ -27,14 +36,12 @@ struct ThreadPool {
     RingBuffer_pthread_t *workers;
     RingBuffer_WorkerArg_t *workerArgs;
     Queue_t *tasks;
+    PoolState_t *state;
 
     pthread_mutex_t *mutexQueue;
     pthread_mutex_t *mutexPool;
     pthread_cond_t *condQueue;
     pthread_cond_t *condFree;
-
-    bool _Atomic isRunning;
-    uint64_t currentTaskId;
 };
 
 static inline void threadTaskDeallocator(void *task) {
@@ -56,7 +63,7 @@ void *threadFunction(void *arg) {
     pthread_mutex_t *mutexQueue = wfArg->mutexQueue;
     pthread_cond_t *condQueue   = wfArg->condQueue;
     pthread_cond_t *condFree    = wfArg->condFree;
-    bool _Atomic *isRunning     = wfArg->isRunning;
+    PoolState_t *state          = wfArg->poolState;
 
     if (!tasks || !mutexQueue || !condQueue) {
         return NULL;
@@ -65,11 +72,12 @@ void *threadFunction(void *arg) {
     ThreadTask_t *taskPtr = NULL;
     while (1) {
         pthread_mutex_lock(mutexQueue);
-        while (*isRunning && !Queue_Peek(tasks, (void **)(&taskPtr))) {
+        while (atomic_load(&state->isRunning) &&
+               !Queue_Peek(tasks, (void **)(&taskPtr))) {
             pthread_cond_wait(condQueue, mutexQueue);
         }
 
-        if (!*isRunning) {
+        if (!atomic_load(&state->isRunning)) {
             pthread_mutex_unlock(mutexQueue);
             break;
         }
@@ -77,12 +85,16 @@ void *threadFunction(void *arg) {
             pthread_mutex_unlock(mutexQueue);
             continue;
         }
+        atomic_fetch_add(&state->tasksStarted, 1);
+
         pthread_cond_signal(condFree);
         pthread_mutex_unlock(mutexQueue);
 
-        printf("[INF] ThreadTask (id=%lu) -- START\n", taskPtr->id);
+        // printf("[INF] ThreadTask (id=%lu) -- START\n", taskPtr->id);
         taskPtr->fn(taskPtr->arg);
-        printf("[INF] ThreadTask (id=%lu) -- END\n", taskPtr->id);
+
+        atomic_fetch_add(&state->tasksFinished, 1);
+        // printf("[INF] ThreadTask (id=%lu) -- END\n", taskPtr->id);
     }
 
     return NULL;
@@ -97,6 +109,7 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
     RingBuffer_pthread_t *workers;
     RingBuffer_WorkerArg_t *workerArgs;
     Queue_t *queue;
+    PoolState_t *state;
     pthread_mutex_t *mutexQueue, *mutexPool;
     pthread_cond_t *condQueue, *condFree;
 
@@ -119,6 +132,16 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
     if (!queue) {
         goto errQueue;
     }
+
+    state = malloc(sizeof(PoolState_t));
+    if (!state) {
+        goto errState;
+    }
+    *state = (PoolState_t){ .isRunning      = false,
+                            .tasksScheduled = 0,
+                            .tasksStarted   = 0,
+                            .tasksFinished  = 0,
+                            .currentTaskId  = 0 };
 
     mutexQueue = malloc(sizeof(pthread_mutex_t));
     if (!mutexQueue) {
@@ -153,15 +176,14 @@ ThreadPool_t *ThreadPool_Create(uint8_t workersCount) {
         goto errCondFreeInit;
     }
 
-    *pool = (ThreadPool_t){ .workers       = workers,
-                            .workerArgs    = workerArgs,
-                            .tasks         = queue,
-                            .mutexQueue    = mutexQueue,
-                            .mutexPool     = mutexPool,
-                            .condQueue     = condQueue,
-                            .condFree      = condFree,
-                            .isRunning     = false,
-                            .currentTaskId = 0 };
+    *pool = (ThreadPool_t){ .workers    = workers,
+                            .workerArgs = workerArgs,
+                            .tasks      = queue,
+                            .mutexQueue = mutexQueue,
+                            .mutexPool  = mutexPool,
+                            .condQueue  = condQueue,
+                            .condFree   = condFree,
+                            .state      = state };
 
     return pool;
 
@@ -180,6 +202,8 @@ errCondQueue:
 errMutexPool:
     free(mutexQueue);
 errMutexQueue:
+    free(state);
+errState:
     Queue_Free(queue);
 errQueue:
     RingBuffer_WorkerArg_Free(workerArgs);
@@ -200,7 +224,7 @@ bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted) {
         return false;
     }
 
-    if (waitTasksCompleted && pool->isRunning) {
+    if (waitTasksCompleted && atomic_load(&pool->state->isRunning)) {
         uint64_t queueLength = 0;
         pthread_mutex_lock(pool->mutexQueue);
         while (Queue_Length(pool->tasks, &queueLength) && queueLength != 0) {
@@ -209,7 +233,7 @@ bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted) {
         pthread_mutex_unlock(pool->mutexQueue);
     }
 
-    pool->isRunning = false;
+    atomic_store(&pool->state->isRunning, false);
 
     pthread_cond_broadcast(pool->condQueue);
     pthread_t pThread;
@@ -229,6 +253,8 @@ bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted) {
 
     Queue_Free(pool->tasks);
     pool->tasks = NULL;
+
+    free(pool->state);
 
     pthread_mutex_destroy(pool->mutexQueue);
     free(pool->mutexQueue);
@@ -274,7 +300,7 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
         goto unlockMutexReturnFalse;
     }
 
-    pool->isRunning = true;
+    atomic_store(&pool->state->isRunning, true);
     for (size_t i = 0; i < workersCapacity; ++i) {
         pthread_t thread;
 
@@ -283,7 +309,7 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
             .mutexQueue = pool->mutexQueue,
             .condQueue  = pool->condQueue,
             .condFree   = pool->condFree,
-            .isRunning  = &pool->isRunning,
+            .poolState  = pool->state,
         };
         WorkerArg_t *argPtr;
 
@@ -312,7 +338,7 @@ bool ThreadPool_Start(ThreadPool_t *pool) {
     }
 
     if (needRollback) {
-        pool->isRunning = false;
+        atomic_store(&pool->state->isRunning, false);
         pthread_cond_broadcast(pool->condQueue);
         for (size_t i = 0; i < createdThreadsCount; ++i) {
             pthread_join(threads[i], NULL);
@@ -346,7 +372,7 @@ bool ThreadPool_Stop(ThreadPool_t *pool) {
         return false;
     }
 
-    pool->isRunning = false;
+    atomic_store(&pool->state->isRunning, false);
 
     pthread_cond_broadcast(pool->condQueue);
     pthread_t pThread;
@@ -375,13 +401,15 @@ bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args,
     }
 
     pthread_mutex_lock(pool->mutexQueue);
-    *task = (ThreadTask_t){ .id          = pool->currentTaskId++,
-                            .fn          = fn,
-                            .arg         = args,
-                            .isArgOnHeap = isArgOnHeap };
+    *task =
+        (ThreadTask_t){ .id  = atomic_fetch_add(&pool->state->currentTaskId, 1),
+                        .fn  = fn,
+                        .arg = args,
+                        .isArgOnHeap = isArgOnHeap };
 
     bool isSuccess = Queue_Push(pool->tasks, task);
     if (isSuccess) {
+        atomic_fetch_add(&pool->state->tasksScheduled, 1);
         pthread_cond_signal(pool->condQueue);
     } else {
         free(task);
@@ -390,4 +418,38 @@ bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args,
     pthread_mutex_unlock(pool->mutexQueue);
 
     return isSuccess;
+}
+
+bool ThreadPool_IsRunning(ThreadPool_t *pool) {
+    if (!pool) {
+        return false;
+    }
+    return atomic_load(&pool->state->isRunning);
+}
+
+bool ThreadPool_TasksScheduled(ThreadPool_t *pool, uint64_t *count) {
+    if (!pool) {
+        return false;
+    }
+
+    *count = atomic_load(&pool->state->tasksScheduled);
+    return true;
+}
+
+bool ThreadPool_TasksStarted(ThreadPool_t *pool, uint64_t *count) {
+    if (!pool) {
+        return false;
+    }
+
+    *count = atomic_load(&pool->state->tasksStarted);
+    return true;
+}
+
+bool ThreadPool_TasksFinished(ThreadPool_t *pool, uint64_t *count) {
+    if (!pool) {
+        return false;
+    }
+
+    *count = atomic_load(&pool->state->tasksFinished);
+    return true;
 }

@@ -31,6 +31,11 @@ bool ThreadPool_Stop(ThreadPool_t *pool);
 bool ThreadPool_Submit(ThreadPool_t *pool, void (*fn)(void *arg), void *args,
                        bool isArgOnHeap);
 
+bool ThreadPool_IsRunning(ThreadPool_t *pool);
+bool ThreadPool_TasksScheduled(ThreadPool_t *pool, uint64_t *count);
+bool ThreadPool_TasksStarted(ThreadPool_t *pool, uint64_t *count);
+bool ThreadPool_TasksFinished(ThreadPool_t *pool, uint64_t *count);
+
 #define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                           \
     do {                                                                       \
         type *_a = malloc(sizeof(type));                                       \

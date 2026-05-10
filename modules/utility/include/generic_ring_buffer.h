@@ -17,7 +17,7 @@ typedef struct {
     uint64_t head, tail, count, capacity;
 } RB_STRUCT;
 
-RB_STRUCT *RB_FUNC(Create)(uint64_t capacity) {
+static inline RB_STRUCT *RB_FUNC(Create)(uint64_t capacity) {
     RB_STRUCT *rb = malloc(sizeof(RB_STRUCT));
     if (rb == NULL) {
         return NULL;
@@ -36,7 +36,7 @@ RB_STRUCT *RB_FUNC(Create)(uint64_t capacity) {
     return rb;
 }
 
-void RB_FUNC(Free)(RB_STRUCT *rb) {
+static inline void RB_FUNC(Free)(RB_STRUCT *rb) {
     if (rb == NULL || rb->arr == NULL) {
         return;
     }
@@ -44,7 +44,7 @@ void RB_FUNC(Free)(RB_STRUCT *rb) {
     rb->arr = NULL;
 }
 
-bool RB_FUNC(Append)(RB_STRUCT *rb, RB_TYPE value) {
+static inline bool RB_FUNC(Append)(RB_STRUCT *rb, RB_TYPE value) {
     if (rb == NULL || rb->arr == NULL || rb->count == rb->capacity) {
         return false;
     }
@@ -58,7 +58,7 @@ bool RB_FUNC(Append)(RB_STRUCT *rb, RB_TYPE value) {
     return true;
 }
 
-bool RB_FUNC(Prepend)(RB_STRUCT *rb, RB_TYPE value) {
+static inline bool RB_FUNC(Prepend)(RB_STRUCT *rb, RB_TYPE value) {
     if (rb == NULL || rb->arr == NULL || rb->count == rb->capacity) {
         return false;
     }
@@ -74,7 +74,7 @@ bool RB_FUNC(Prepend)(RB_STRUCT *rb, RB_TYPE value) {
     return true;
 }
 
-bool RB_FUNC(PeekFirst)(RB_STRUCT *rb, RB_TYPE **out) {
+static inline bool RB_FUNC(PeekFirst)(RB_STRUCT *rb, RB_TYPE **out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
@@ -82,7 +82,7 @@ bool RB_FUNC(PeekFirst)(RB_STRUCT *rb, RB_TYPE **out) {
     return true;
 }
 
-bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE **out) {
+static inline bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE **out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
@@ -98,7 +98,7 @@ bool RB_FUNC(PeekLast)(RB_STRUCT *rb, RB_TYPE **out) {
     return true;
 }
 
-bool RB_FUNC(PopFirst)(RB_STRUCT *rb, RB_TYPE *out) {
+static inline bool RB_FUNC(PopFirst)(RB_STRUCT *rb, RB_TYPE *out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
@@ -112,7 +112,7 @@ bool RB_FUNC(PopFirst)(RB_STRUCT *rb, RB_TYPE *out) {
     return true;
 }
 
-bool RB_FUNC(PopLast)(RB_STRUCT *rb, RB_TYPE *out) {
+static inline bool RB_FUNC(PopLast)(RB_STRUCT *rb, RB_TYPE *out) {
     if (rb == NULL || rb->arr == NULL || rb->count == 0) {
         return false;
     }
@@ -128,7 +128,7 @@ bool RB_FUNC(PopLast)(RB_STRUCT *rb, RB_TYPE *out) {
     return true;
 }
 
-bool RB_FUNC(GetAt)(RB_STRUCT *rb, uint64_t index, RB_TYPE *out) {
+static inline bool RB_FUNC(GetAt)(RB_STRUCT *rb, uint64_t index, RB_TYPE *out) {
     if (rb == NULL || rb->arr == NULL || index >= rb->count) {
         return false;
     }
@@ -143,7 +143,7 @@ bool RB_FUNC(GetAt)(RB_STRUCT *rb, uint64_t index, RB_TYPE *out) {
     return true;
 }
 
-bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool *out) {
+static inline bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool *out) {
     if (rb == NULL || rb->arr == NULL) {
         return false;
     }
@@ -152,7 +152,7 @@ bool RB_FUNC(IsEmpty)(RB_STRUCT *rb, bool *out) {
     return true;
 }
 
-bool RB_FUNC(Length)(RB_STRUCT *rb, uint64_t *out) {
+static inline bool RB_FUNC(Length)(RB_STRUCT *rb, uint64_t *out) {
     if (rb == NULL || rb->arr == NULL) {
         return false;
     }
@@ -161,7 +161,7 @@ bool RB_FUNC(Length)(RB_STRUCT *rb, uint64_t *out) {
     return true;
 }
 
-bool RB_FUNC(Capacity)(RB_STRUCT *rb, uint64_t *out) {
+static inline bool RB_FUNC(Capacity)(RB_STRUCT *rb, uint64_t *out) {
     if (rb == NULL || rb->arr == NULL) {
         return false;
     }
@@ -170,6 +170,5 @@ bool RB_FUNC(Capacity)(RB_STRUCT *rb, uint64_t *out) {
     return true;
 }
 
-#undef RB_GUARD
 #undef RB_FUNC
 #undef RB_STRUCT
