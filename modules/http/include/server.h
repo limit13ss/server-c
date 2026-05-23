@@ -6,7 +6,6 @@
 
 #include "stdint.h"
 
-int32_t server_initMainListener(void);
-void server_mainLoop(void);
+int32_t server_mainLoop(void);
 
 #endif // NAZARK_SERVER_H

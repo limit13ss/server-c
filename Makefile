@@ -7,7 +7,7 @@ MOD_UTIL_INCLUDE = modules/utility/include
 MOD_UTIL_SRC = modules/utility/src
 MOD_UTIL_TESTS = modules/utility/tests
 
-CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion
+CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion -D_POSIX_C_SOURCE=200809L
 ALL_CFLAGS = $(CFLAGS) -I$(MOD_HTTP_INCLUDE) -I$(MOD_UTIL_INCLUDE)
 DEBUG_CFLAGS = -g
 

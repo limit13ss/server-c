@@ -5,4 +5,6 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#define ERROR_SERVER_INVALID_SOCKET_DESCRIPTOR 1001
+
 #endif // NAZARK_COMMON_H
