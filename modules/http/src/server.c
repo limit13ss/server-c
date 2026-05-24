@@ -20,10 +20,20 @@
 
 volatile sig_atomic_t g_isApplicationAlive = 1;
 
+/// -------------------------------------
+/// General operations
+/// -------------------------------------
+
 void handleProcSignal(int sig) {
     (void)sig;
     g_isApplicationAlive = 0;
 }
+
+uint8_t getThreadPoolWorkersCount(void) { return 10; }
+
+/// -------------------------------------
+/// Socket related operations
+/// -------------------------------------
 
 int32_t initSocket(uint8_t connectionQueueSize) {
     int32_t socketFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -65,7 +75,19 @@ int32_t initMainListener(void) {
     return socketFd;
 }
 
-uint8_t getThreadPoolWorkersCount(void) { return 10; }
+/// -------------------------------------
+/// Main connection operations
+/// -------------------------------------
+
+void processSocketConnection(void *arg) {
+    if (arg == NULL) {
+        return;
+    }
+
+    int32_t clientFd = *((int32_t *)(arg));
+
+    close(clientFd);
+}
 
 int32_t server_mainLoop(void) {
     struct sigaction sa = { .sa_handler = handleProcSignal,
@@ -118,8 +140,8 @@ int32_t server_mainLoop(void) {
             goto errorCloseEpoll;
         }
 
+        // Timeout
         if (ready == 0) {
-            // Timeout
             continue;
         }
 
@@ -143,9 +165,8 @@ int32_t server_mainLoop(void) {
 
             printf(stdout, "[INF] Accepted connection (fd=%d)\n", clientFd);
 
-            // TODO: handle client connection
-
-            close(clientFd);
+            THREAD_POOL_SUBMIT_TASK(threadPool, processSocketConnection,
+                                    int32_t, clientFd);
         }
     }
 

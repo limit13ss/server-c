@@ -32,6 +32,13 @@ typedef struct WorkerArg {
 #undef RB_TYPE_NAME
 #endif // NKRYLOV_RING_BUFFER_WORKER_ARG
 
+typedef struct ThreadTask {
+    uint64_t id;
+    void (*fn)(void *arg);
+    void *arg;
+    bool isArgOnHeap;
+} ThreadTask_t;
+
 struct ThreadPool {
     RingBuffer_pthread_t *workers;
     RingBuffer_WorkerArg_t *workerArgs;

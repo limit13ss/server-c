@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200112L
-
 #include "thread_pool.h"
 
 #include <assert.h>

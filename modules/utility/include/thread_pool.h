@@ -17,13 +17,6 @@
 
 typedef struct ThreadPool ThreadPool_t;
 
-typedef struct ThreadTask {
-    uint64_t id;
-    void (*fn)(void *arg);
-    void *arg;
-    bool isArgOnHeap;
-} ThreadTask_t;
-
 ThreadPool_t *ThreadPool_Create(uint8_t workersCount);
 bool ThreadPool_Free(ThreadPool_t *pool, bool waitTasksCompleted);
 bool ThreadPool_Start(ThreadPool_t *pool);
@@ -39,9 +32,11 @@ bool ThreadPool_TasksFinished(ThreadPool_t *pool, uint64_t *count);
 #define THREAD_POOL_SUBMIT_TASK(pool, fn, type, ...)                           \
     do {                                                                       \
         type *_a = malloc(sizeof(type));                                       \
-        *_a      = (type){ __VA_ARGS__ };                                      \
-        if (!ThreadPool_Submit(pool, fn, _a, true)) {                          \
-            free(_a);                                                          \
+        if (_a != NULL) {                                                      \
+            *_a = (type){ __VA_ARGS__ };                                       \
+            if (!ThreadPool_Submit(pool, fn, _a, true)) {                      \
+                free(_a);                                                      \
+            }                                                                  \
         }                                                                      \
     } while (0)
 
