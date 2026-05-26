@@ -1,5 +1,6 @@
 #include "server.h"
 #include "common.h"
+#include "request_parser.h"
 #include "socket_option.h"
 #include "thread_pool.h"
 
@@ -17,6 +18,7 @@
 #include <unistd.h>
 
 #define MAX_EVENTS 10
+#define WORKERS_COUNT_CLIENT_PARSERS 2
 
 volatile sig_atomic_t g_isApplicationAlive = 1;
 
@@ -28,8 +30,6 @@ void handleProcSignal(int sig) {
     (void)sig;
     g_isApplicationAlive = 0;
 }
-
-uint8_t getThreadPoolWorkersCount(void) { return 10; }
 
 /// -------------------------------------
 /// Socket related operations
@@ -79,16 +79,6 @@ int32_t initMainListener(void) {
 /// Main connection operations
 /// -------------------------------------
 
-void processSocketConnection(void *arg) {
-    if (arg == NULL) {
-        return;
-    }
-
-    int32_t clientFd = *((int32_t *)(arg));
-
-    close(clientFd);
-}
-
 int32_t server_mainLoop(void) {
     struct sigaction sa = { .sa_handler = handleProcSignal,
                             .sa_flags   = SA_RESTART | SA_SIGINFO };
@@ -100,8 +90,9 @@ int32_t server_mainLoop(void) {
     if (mainSocketFd < 0) {
         return ERROR_SERVER_INVALID_SOCKET_DESCRIPTOR;
     }
+    socket_option_setNonBlocking(mainSocketFd);
 
-    ThreadPool_t *threadPool = ThreadPool_Create(getThreadPoolWorkersCount());
+    ThreadPool_t *threadPool = ThreadPool_Create(WORKERS_COUNT_CLIENT_PARSERS);
     if (threadPool == NULL) {
         printf(stderr, "[ERR] Initialization error: ThreadPool_Create\n");
         goto errorCloseMainSocket;
@@ -120,17 +111,15 @@ int32_t server_mainLoop(void) {
     }
 
     fprintf(stdout,
-            "[INF] Server is initalized successfully.\nListening on port :%d "
-            "(Ctrl+C to stop)...\n",
+            "[INF] Server is initalized successfully.\n"
+            "Listening on port :%d (Ctrl+C to stop)...\n",
             SERVER_PORT);
 
-    int32_t ready     = 0;
-    int32_t timeoutMs = 700;
-
+    int32_t ready = 0;
     struct epoll_event events[MAX_EVENTS];
 
     while (g_isApplicationAlive) {
-        ready = epoll_wait(epollFd, events, MAX_EVENTS, timeoutMs);
+        ready = epoll_wait(epollFd, events, MAX_EVENTS, -1);
 
         if (ready < 0) {
             if (errno == EINTR) {
@@ -138,11 +127,6 @@ int32_t server_mainLoop(void) {
             }
             printf(stderr, "[ERR] Main loop error during \"epoll_wait\"\n");
             goto errorCloseEpoll;
-        }
-
-        // Timeout
-        if (ready == 0) {
-            continue;
         }
 
         for (int32_t i; i < ready; i++) {
@@ -155,8 +139,8 @@ int32_t server_mainLoop(void) {
             int32_t clientFd    = accept(
                 mainSocketFd, (struct sockaddr *)(&clientAddr), &clientLen);
 
-            if (clientFd < 0) {
-                if (errno == EINTR) {
+            if (clientFd == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     continue;
                 }
                 printf(stderr, "[ERR] Main loop error during \"accept\"\n");
@@ -165,8 +149,27 @@ int32_t server_mainLoop(void) {
 
             printf(stdout, "[INF] Accepted connection (fd=%d)\n", clientFd);
 
-            THREAD_POOL_SUBMIT_TASK(threadPool, processSocketConnection,
-                                    int32_t, clientFd);
+            switch (socket_option_setNonBlocking(clientFd)) {
+            case -1:
+                printf(stderr, "[ERR] \"setNonBlocking\": F_GETFL\n");
+                close(clientFd);
+                continue;
+            case -2:
+                printf(stderr, "[ERR] \"setNonBlocking\": F_SETFL\n");
+                close(clientFd);
+                continue;
+            }
+
+            ev.events  = EPOLLIN | EPOLLET;
+            ev.data.fd = clientFd;
+            if (epoll_ctl(epollFd, EPOLL_CTL_ADD, clientFd, &ev) == -1) {
+                fprintf(stderr, "[ERR] \"epoll_ctl\": clientFd (%d)\n",
+                        clientFd);
+                close(clientFd);
+            }
+
+            THREAD_POOL_SUBMIT_TASK(threadPool, parseClientRequest, int32_t,
+                                    clientFd);
         }
     }
 
