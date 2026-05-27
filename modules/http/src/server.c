@@ -1,11 +1,11 @@
 #include "server.h"
 #include "common.h"
-#include "request_parser.h"
+#include "generic_set.h"
 #include "socket_option.h"
-#include "thread_pool.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/epoll.h>
@@ -22,13 +22,32 @@
 
 volatile sig_atomic_t g_isApplicationAlive = 1;
 
-/// -------------------------------------
-/// General operations
-/// -------------------------------------
-
 void handleProcSignal(int sig) {
     (void)sig;
     g_isApplicationAlive = 0;
+}
+
+typedef struct ParserThreadArg {
+    Set_i32_t *clients;
+    struct epoll_event *events;
+    pthread_cond_t *condVariable;
+    pthread_mutex_t *mutex;
+} ParserThreadArg_t;
+
+void *parserThreadRoutine(void *arg) {
+    if (arg == NULL) {
+        return NULL;
+    }
+
+    ParserThreadArg_t *parserArg = (ParserThreadArg_t *)(arg);
+    (void)parserArg;
+
+    return NULL;
+}
+
+bool processClient(int32_t clientFd) {
+    (void)clientFd;
+    return false;
 }
 
 /// -------------------------------------
@@ -92,22 +111,44 @@ int32_t server_mainLoop(void) {
     }
     socket_option_setNonBlocking(mainSocketFd);
 
-    ThreadPool_t *threadPool = ThreadPool_Create(WORKERS_COUNT_CLIENT_PARSERS);
-    if (threadPool == NULL) {
-        printf(stderr, "[ERR] Initialization error: ThreadPool_Create\n");
-        goto errorCloseMainSocket;
-    }
-
     int32_t epollFd = epoll_create1(0);
     if (epollFd < 0) {
         printf(stderr, "[ERR] Initialization error: epoll_create1\n");
-        goto errorCloseThreadPool;
+        goto errorCloseMainSocket;
     }
 
     struct epoll_event ev = { .events = EPOLLIN, .data.fd = mainSocketFd };
     if (epoll_ctl(epollFd, EPOLL_CTL_ADD, mainSocketFd, &ev) < 0) {
         printf(stderr, "[ERR] Initialization error: epoll_ctl\n");
         goto errorCloseEpoll;
+    }
+
+    pthread_cond_t parserCond;
+    if (pthread_cond_init(&parserCond, NULL)) {
+        printf(stderr, "[ERR] Initialization error: pthread_cond_init\n");
+        goto errorCloseEpoll;
+    }
+    pthread_mutex_t parserMutex;
+    if (pthread_mutex_init(&parserMutex, NULL)) {
+        printf(stderr, "[ERR] Initialization error: pthread_mutex_init\n");
+        goto errorCloseParserCond;
+    }
+
+    Set_i32_t *clientsSet = Set_i32_Create();
+    if (clientsSet == NULL) {
+        printf(stderr, "[ERR] Initialization error: Set_i32_Create\n");
+        goto errorCloseParserMutex;
+    }
+
+    ParserThreadArg_t parserThreadArg = { .clients      = clientsSet,
+                                          .events       = &ev,
+                                          .condVariable = &parserCond,
+                                          .mutex        = &parserMutex };
+
+    pthread_t parserThreads[WORKERS_COUNT_CLIENT_PARSERS];
+    for (size_t i = 0; i < WORKERS_COUNT_CLIENT_PARSERS; i++) {
+        pthread_create(&parserThreads[i], NULL, parserThreadRoutine,
+                       &parserThreadArg);
     }
 
     fprintf(stdout,
@@ -168,21 +209,31 @@ int32_t server_mainLoop(void) {
                 close(clientFd);
             }
 
-            THREAD_POOL_SUBMIT_TASK(threadPool, parseClientRequest, int32_t,
-                                    clientFd);
+            if (!processClient(clientFd)) {
+                close(clientFd);
+            }
         }
     }
 
+    for (size_t i = 0; i < WORKERS_COUNT_CLIENT_PARSERS; i++) {
+        pthread_cancel(parserThreads[i]);
+        pthread_join(parserThreads[i], NULL);
+    }
+
+    Set_i32_Free(clientsSet);
+    pthread_mutex_destroy(&parserMutex);
+    pthread_cond_destroy(&parserCond);
     close(epollFd);
-    ThreadPool_Free(threadPool, true);
     close(mainSocketFd);
 
     return 0;
 
+errorCloseParserMutex:
+    pthread_mutex_destroy(&parserMutex);
+errorCloseParserCond:
+    pthread_cond_destroy(&parserCond);
 errorCloseEpoll:
     close(epollFd);
-errorCloseThreadPool:
-    ThreadPool_Free(threadPool, true);
 errorCloseMainSocket:
     close(mainSocketFd);
 
