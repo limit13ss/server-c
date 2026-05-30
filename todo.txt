@@ -1,0 +1,11 @@
+1. ConcurrentLinkedList.
+2. LinkedList tests.
+3. Reading and parsing client requests.
+4. ...
+
+.
+.
+.
+
+n. Error codes for every existing entities from "utilities".
+n + 1. Update tests for new codes.

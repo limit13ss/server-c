@@ -4,8 +4,11 @@
 #define SERVER_PORT 1337
 #define SERVER_REQUESTS_QUEUE_SIZE 128
 
-#include "stdint.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 int32_t server_mainLoop(void);
+
+bool isApplicationAlive(void);
 
 #endif // NAZARK_SERVER_H

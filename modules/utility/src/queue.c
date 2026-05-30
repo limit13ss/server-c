@@ -2,25 +2,27 @@
 
 #include <stdlib.h>
 
-struct Node {
+struct QueueNode {
     void *data;
-    struct Node *next;
+    struct QueueNode *next;
 };
 
 struct Queue {
-    Node_t *head;
-    Node_t *tail;
+    QueueNode_t *head;
+    QueueNode_t *tail;
     uint64_t length;
     void (*deallocator)(void *data);
 };
 
-Queue_t* Queue_Create(void (*deallocator)(void *data)) {
-    Queue_t* q = malloc(sizeof(Queue_t));
+Queue_t *Queue_Create(void (*deallocator)(void *data)) {
+    Queue_t *q = malloc(sizeof(Queue_t));
     if (q == NULL) {
         return NULL;
     }
 
-    *q = (Queue_t){ .head = NULL, .tail = NULL, .length = 0, .deallocator = deallocator };
+    *q = (Queue_t){
+        .head = NULL, .tail = NULL, .length = 0, .deallocator = deallocator
+    };
     return q;
 }
 
@@ -29,8 +31,8 @@ bool Queue_Free(Queue_t *q) {
         return false;
     }
 
-    Node_t *cur  = q->head;
-    Node_t *next = cur->next;
+    QueueNode_t *cur  = q->head;
+    QueueNode_t *next = cur->next;
 
     while (cur != NULL) {
         next = cur->next;
@@ -51,9 +53,9 @@ bool Queue_Push(Queue_t *q, void *data) {
         return false;
     }
 
-    Node_t *newNode = malloc(sizeof(Node_t));
-    newNode->data   = data;
-    newNode->next   = NULL;
+    QueueNode_t *newNode = malloc(sizeof(QueueNode_t));
+    newNode->data        = data;
+    newNode->next        = NULL;
 
     if (q->tail == NULL) {
         q->tail = newNode;
@@ -71,19 +73,18 @@ bool Queue_Push(Queue_t *q, void *data) {
 }
 
 bool Queue_Pop(Queue_t *q, void **outData) {
-    if (q == NULL || q->length == 0 || q->head == NULL) {
+    if (q == NULL || q->length == 0 || outData == NULL) {
         return false;
     }
 
-    *outData     = q->head->data;
-    Node_t *next = q->head->next;
+    *outData          = q->head->data;
+    QueueNode_t *next = q->head->next;
 
     free(q->head);
-    q->head = next;
-
     --q->length;
-    if (q->length == 0) {
-        q->head = NULL;
+
+    q->head = next;
+    if (q->head == NULL) {
         q->tail = NULL;
     }
 
@@ -91,7 +92,7 @@ bool Queue_Pop(Queue_t *q, void **outData) {
 }
 
 bool Queue_Peek(Queue_t *q, void **outData) {
-    if (q == NULL || q->length == 0 || q->head == NULL) {
+    if (q == NULL || q->length == 0 || outData == NULL) {
         return false;
     }
 
@@ -100,7 +101,7 @@ bool Queue_Peek(Queue_t *q, void **outData) {
 }
 
 bool Queue_Length(Queue_t *q, uint64_t *out) {
-    if (q == NULL) {
+    if (q == NULL || out == NULL) {
         return false;
     }
 

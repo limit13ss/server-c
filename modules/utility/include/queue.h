@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct Node Node_t;
+typedef struct QueueNode QueueNode_t;
 
 typedef struct Queue Queue_t;
 
