@@ -10,25 +10,27 @@ typedef struct ConcurrentLinkedList ConcurrentLinkedList_t;
 
 ConcurrentLinkedList_t *
 ConcurrentLinkedList_Create(void (*deallocator)(void *data));
-bool ConcurrentLinkedList_Free(ConcurrentLinkedList_t *ll);
-bool ConcurrentLinkedList_Length(ConcurrentLinkedList_t *ll, uint64_t *out);
+int32_t ConcurrentLinkedList_Free(ConcurrentLinkedList_t *cll);
+int32_t ConcurrentLinkedList_Length(ConcurrentLinkedList_t *cll, uint64_t *out);
 
-bool ConcurrentLinkedList_AddStart(ConcurrentLinkedList_t *ll, void *data);
-bool ConcurrentLinkedList_AddEnd(ConcurrentLinkedList_t *ll, void *data);
-bool ConcurrentLinkedList_AddAt(ConcurrentLinkedList_t *ll, uint64_t idx,
+int32_t ConcurrentLinkedList_AddStart(ConcurrentLinkedList_t *cll, void *data);
+int32_t ConcurrentLinkedList_AddEnd(ConcurrentLinkedList_t *cll, void *data);
+int32_t ConcurrentLinkedList_AddAt(ConcurrentLinkedList_t *cll, uint64_t idx,
                                 void *data);
 
-bool ConcurrentLinkedList_PopStart(ConcurrentLinkedList_t *ll, void **outData);
-bool ConcurrentLinkedList_PopEnd(ConcurrentLinkedList_t *ll, void **outData);
-bool ConcurrentLinkedList_PopAt(ConcurrentLinkedList_t *ll, uint64_t idx,
+int32_t ConcurrentLinkedList_PopStart(ConcurrentLinkedList_t *cll, void **outData);
+int32_t ConcurrentLinkedList_PopEnd(ConcurrentLinkedList_t *cll, void **outData);
+int32_t ConcurrentLinkedList_PopAt(ConcurrentLinkedList_t *cll, uint64_t idx,
                                 void **outData);
 
-bool ConcurrentLinkedList_PeekStart(ConcurrentLinkedList_t *ll, void **outData);
-bool ConcurrentLinkedList_PeekEnd(ConcurrentLinkedList_t *ll, void **outData);
-bool ConcurrentLinkedList_PeekAt(ConcurrentLinkedList_t *ll, uint64_t idx,
+int32_t ConcurrentLinkedList_PeekStart(ConcurrentLinkedList_t *cll, void **outData);
+int32_t ConcurrentLinkedList_PeekEnd(ConcurrentLinkedList_t *cll, void **outData);
+int32_t ConcurrentLinkedList_PeekAt(ConcurrentLinkedList_t *cll, uint64_t idx,
                                  void **outData);
 
-bool ConcurrentLinkedList_NodeAt(ConcurrentLinkedList_t *ll, uint64_t idx, ListNode_t *outNode);
-bool ConcurrentLinkedList_RemoveNode(ConcurrentLinkedList_t *ll, ListNode_t *Node);
+int32_t ConcurrentLinkedList_NodeAt(ConcurrentLinkedList_t *cll, uint64_t idx, ListNode_t **outNode);
+int32_t ConcurrentLinkedList_RemoveNode(ConcurrentLinkedList_t *cll, ListNode_t *theNode);
+
+int32_t ConcurrentLinkedList_Next(ConcurrentLinkedList_t *cll, ListNode_t **outNode, void **outData);
 
 #endif // NAZARK_CONCURRENT_LINKED_LIST_H

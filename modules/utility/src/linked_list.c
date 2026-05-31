@@ -378,3 +378,34 @@ int32_t LinkedList_RemoveNode(LinkedList_t *ll, ListNode_t *theNode) {
 
     return 0;
 }
+
+int32_t LinkedList_Next(LinkedList_t *ll, ListNode_t **outNode,
+                        void **outData) {
+    if (ll == NULL) {
+        return LL_ERROR_NULL_POINTER_LIST;
+    }
+    if (outNode == NULL || outData == NULL) {
+        return LL_ERROR_NULL_POINTER_ARG;
+    }
+
+    if (ll->length == 0) {
+        *outNode = NULL;
+        *outData = NULL;
+        return 0;
+    }
+
+    if (*outNode == NULL) {
+        *outNode = ll->head;
+        *outData = (*outNode)->data;
+        return 0;
+    }
+
+    if ((*outNode)->holderList != ll) {
+        return LL_ERROR_ALIEN_NODE;
+    }
+
+    *outNode = (*outNode)->next;
+    *outData = (*outNode)->data;
+
+    return 0;
+}

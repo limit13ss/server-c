@@ -26,6 +26,8 @@ int32_t LinkedList_PeekAt(LinkedList_t *ll, uint64_t idx, void **outData);
 int32_t LinkedList_NodeAt(LinkedList_t *ll, uint64_t idx, ListNode_t **outNode);
 int32_t LinkedList_RemoveNode(LinkedList_t *ll, ListNode_t *theNode);
 
+int32_t LinkedList_Next(LinkedList_t *ll, ListNode_t **outNode, void **outData);
+
 #define LL_ERROR_NULL_POINTER_LIST -1
 #define LL_ERROR_NULL_POINTER_ARG -2
 #define LL_ERROR_INDEX_OUT_OF_BOUNDS -3
