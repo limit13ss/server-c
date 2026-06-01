@@ -1,6 +1,6 @@
-1. ConcurrentLinkedList.
-2. LinkedList tests.
-3. Reading and parsing client requests.
+1. Reading and parsing HTTP request line.
+2. Reading and partins HTTP headers.
+3. Closing idle clients after N seconds of no actions taken.
 4. ...
 
 .
@@ -9,3 +9,4 @@
 
 n. Error codes for every existing entities from "utilities".
 n + 1. Update tests for new codes.
+n + 2. LinkedList tests.
