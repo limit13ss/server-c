@@ -7,8 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-int32_t server_mainLoop(void);
-
-bool isApplicationAlive(void);
+int32_t server_run(void);
 
 #endif // NAZARK_SERVER_H

@@ -2,13 +2,15 @@
 #define NAZARK_CLIENT_READER_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/epoll.h>
 
 #define MAX_SIMULTANEOUS_READ_EVENTS 10
 
 typedef struct ClientReaderArg {
     int32_t epoll;
-    bool (*isApplicationAlive)(void);
+    int32_t stopEventFd;
+    bool (*isServerAlive)(void);
     bool threadFailed;
 } ClientReaderArg_t;
 
