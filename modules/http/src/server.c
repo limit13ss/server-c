@@ -1,14 +1,12 @@
 #include "server.h"
 #include "client_reader.h"
 #include "common.h"
-#include "concurrent_linked_list.h"
 #include "socket_option.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 
@@ -18,28 +16,21 @@
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_EVENTS 10
-#define WORKERS_COUNT_CLIENT_PARSERS 2
+#define MAX_SIMULTANEOUS_CONNECTION_EVENTS 10
 
 volatile sig_atomic_t g_isApplicationAlive = 1;
+
 bool isApplicationAlive(void) { return (bool)g_isApplicationAlive; }
+
+void stopApplication(void) { g_isApplicationAlive = 0; }
 
 void handleProcSignal(int sig) {
     (void)sig;
-    g_isApplicationAlive = 0;
+    stopApplication();
 }
 
-bool processClient(int32_t clientFd) {
-    (void)clientFd;
-    return false;
-}
-
-void int32Deallocator(void *data) {
-    if (data == NULL) {
-        return;
-    }
-    free(data);
-}
+int32_t g_mainEpoll    = 0;
+int32_t g_clientsEpoll = 0;
 
 /// -------------------------------------
 /// Socket related operations
@@ -76,13 +67,12 @@ int32_t initSocket(uint8_t connectionQueueSize) {
     return socketFd;
 }
 
-int32_t mainLoopAction(int32_t mainSocketFd, int32_t epollFd,
-                       struct epoll_event *ev,
-                       ConcurrentLinkedList_t *clientList) {
+int32_t mainLoopAction(int32_t mainSocketFd) {
     int32_t ready = 0;
-    struct epoll_event events[MAX_EVENTS];
+    struct epoll_event events[MAX_SIMULTANEOUS_CONNECTION_EVENTS];
 
-    ready = epoll_wait(epollFd, events, MAX_EVENTS, -1);
+    ready =
+        epoll_wait(g_mainEpoll, events, MAX_SIMULTANEOUS_CONNECTION_EVENTS, -1);
 
     if (ready < 0) {
         if (errno == EINTR) {
@@ -110,8 +100,6 @@ int32_t mainLoopAction(int32_t mainSocketFd, int32_t epollFd,
             return errno;
         }
 
-        printf(stdout, "[INF] Accepted connection (fd=%d)\n", clientFd);
-
         switch (socket_option_setNonBlocking(clientFd)) {
         case -1:
             printf(stderr, "[ERR] setNonBlocking: F_GETFL\n");
@@ -123,29 +111,14 @@ int32_t mainLoopAction(int32_t mainSocketFd, int32_t epollFd,
             continue;
         }
 
-        ev->events  = EPOLLIN | EPOLLET;
-        ev->data.fd = clientFd;
-        if (epoll_ctl(epollFd, EPOLL_CTL_ADD, clientFd, ev) == -1) {
-            fprintf(stderr, "[ERR] epoll_ctl: clientFd (%d)\n", clientFd);
+        struct epoll_event ev = { .events  = EPOLLIN | EPOLLET,
+                                  .data.fd = clientFd };
+        if (epoll_ctl(g_clientsEpoll, EPOLL_CTL_ADD, clientFd, &ev) != 0) {
+            printf(stderr, "[ERR] epoll_ctl: ADD clientFd=%d\n", clientFd);
             close(clientFd);
-            continue;
         }
 
-        int32_t *clientFdPtr = malloc(sizeof(int32_t));
-        if (clientFdPtr == NULL) {
-            fprintf(stderr, "[ERR] mainLoopAction: malloc clientFdPtr\n");
-            close(clientFd);
-            continue;
-        }
-
-        *clientFdPtr = clientFd;
-        if (!ConcurrentLinkedList_AddEnd(clientList, (void *)clientFdPtr)) {
-            fprintf(stderr,
-                    "[ERR] mainLoopAction: ConcurrentLinkedList_AddEnd\n");
-            free(clientFdPtr);
-            close(clientFd);
-            continue;
-        }
+        printf(stdout, "[INF] Accepted connection (fd=%d)\n", clientFd);
     }
 
     return 0;
@@ -166,39 +139,42 @@ int32_t server_start(void) {
     }
     socket_option_setNonBlocking(mainSocketFd);
 
-    int32_t epollFd = epoll_create1(0);
-    if (epollFd != 0) {
-        printf(stderr, "[ERR] Initialization error: epoll_create1 - %d\n",
+    g_mainEpoll = epoll_create1(0);
+    if (g_mainEpoll != 0) {
+        printf(stderr,
+               "[ERR] Initialization error: epoll_create1 (g_mainEpoll) - %d\n",
                errno);
         returnCode = -1;
         goto closeMainSocket;
     }
+    g_clientsEpoll = epoll_create1(0);
+    if (g_clientsEpoll != 0) {
+        printf(
+            stderr,
+            "[ERR] Initialization error: epoll_create1 (g_clientsEpoll) - %d\n",
+            errno);
+        returnCode = -1;
+        goto closeMainEpoll;
+    }
 
     struct epoll_event ev = { .events = EPOLLIN, .data.fd = mainSocketFd };
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, mainSocketFd, &ev) != 0) {
+    if (epoll_ctl(g_mainEpoll, EPOLL_CTL_ADD, mainSocketFd, &ev) != 0) {
         printf(stderr, "[ERR] Initialization error: epoll_ctl - %d\n", errno);
         returnCode = -1;
-        goto closeEpoll;
+        goto closeAllEpolls;
     }
 
-    ConcurrentLinkedList_t *clientList = ConcurrentLinkedList_Create(&int32Deallocator);
-    if (clientList == NULL) {
-        printf(stderr, "[ERR] Initialization error: LinkedList_Create\n");
-        returnCode = -1;
-        goto closeEpoll;
-    }
-
-    ClientReaderArg_t clientReaderArg = { .clients = clientList,
-                                          .event   = &ev,
-                                          .isApplicationAlive =
-                                              &isApplicationAlive };
+    ClientReaderArg_t clientReaderArg =
+        (ClientReaderArg_t){ .epoll              = g_clientsEpoll,
+                             .isApplicationAlive = &isApplicationAlive,
+                             .threadFailed       = false };
 
     pthread_t clientReaderThread;
     if (pthread_create(&clientReaderThread, NULL, &clientReaderRoutine,
                        &clientReaderArg) != 0) {
         printf(stderr, "[ERR] Initialization error: pthread_create\n");
         returnCode = -1;
-        goto freeLinkedList;
+        goto closeAllEpolls;
     }
 
     fprintf(stdout,
@@ -207,19 +183,26 @@ int32_t server_start(void) {
             SERVER_PORT);
 
     while (isApplicationAlive()) {
-        returnCode = mainLoopAction(mainSocketFd, epollFd, &ev, clientList);
+        if (clientReaderArg.threadFailed) {
+            printf(stderr, "[ERR] Client reading thread had failed\n");
+            stopApplication();
+            break;
+        }
+
+        returnCode = mainLoopAction(mainSocketFd);
         if (returnCode) {
             break;
         }
     }
 
-freeLinkedList:
-    ConcurrentLinkedList_Free(clientList);
     pthread_cancel(clientReaderThread);
     pthread_join(clientReaderThread, NULL);
 
-closeEpoll:
-    close(epollFd);
+closeAllEpolls:
+    close(g_clientsEpoll);
+
+closeMainEpoll:
+    close(g_mainEpoll);
 
 closeMainSocket:
     close(mainSocketFd);

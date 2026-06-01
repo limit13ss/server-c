@@ -1,18 +1,18 @@
 #ifndef NAZARK_CLIENT_READER_H
 #define NAZARK_CLIENT_READER_H
 
-#include "concurrent_linked_list.h"
-
-#include <sys/epoll.h>
 #include <stdbool.h>
+#include <sys/epoll.h>
+
+#define MAX_SIMULTANEOUS_READ_EVENTS 10
 
 typedef struct ClientReaderArg {
-    ConcurrentLinkedList_t *clients;
-    struct epoll_event *event;
+    int32_t epoll;
     bool (*isApplicationAlive)(void);
+    bool threadFailed;
 } ClientReaderArg_t;
 
 /// argument of type ClientReaderArg_t *
-void* clientReaderRoutine(void *arg);
+void *clientReaderRoutine(void *arg);
 
 #endif // NAZARK_CLIENT_READER_H
