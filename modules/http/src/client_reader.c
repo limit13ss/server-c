@@ -63,8 +63,12 @@ int32_t readFromClient(const int32_t fd) {
         return -1;
     }
 
-    return (int32_t)recv(fd, cb->buffer + cb->startPos,
-                         cb->bufLen - cb->startPos, 0);
+    int32_t read = (int32_t)recv(fd, cb->buffer + cb->startPos,
+                                 cb->bufLen - cb->startPos, 0);
+    if (read > 0) {
+        cb->startPos += (uint32_t)read;
+    }
+    return read;
 }
 
 void *clientReaderRoutine(void *arg) {
