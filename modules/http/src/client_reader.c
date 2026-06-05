@@ -63,8 +63,14 @@ int32_t readFromClient(const int32_t fd) {
         return -1;
     }
 
-    int32_t read = (int32_t)recv(fd, cb->buffer + cb->startPos,
-                                 cb->bufLen - cb->startPos, 0);
+    if (cb->startPos >= cb->bufLen) {
+        return -1;
+    }
+
+    void *startByte    = cb->buffer + cb->startPos;
+    uint32_t freeBytes = cb->bufLen - cb->startPos;
+    int32_t read       = (int32_t)recv(fd, startByte, freeBytes, 0);
+
     if (read > 0) {
         cb->startPos += (uint32_t)read;
     }
