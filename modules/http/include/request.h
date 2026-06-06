@@ -4,6 +4,10 @@
 #include "common.h"
 #include <stdint.h>
 
+/// ==================== ======= ====================
+/// ==================== REQUEST ====================
+/// ==================== ======= ====================
+
 typedef struct {
     NKString *params;
     uint16_t count;
@@ -37,33 +41,30 @@ typedef struct {
     RequestParamArray params;
     RequestHeaderArray headers;
     NKString body;
-} HttpRequestData;
+} HttpRequest;
 
-/// ===================== =========== =====================
-/// ===================== HttpRequest =====================
-/// ===================== =========== =====================
+int32_t HttpRequest_Init(HttpRequest *req);
 
-typedef struct HttpRequest HttpRequest_t;
+/// ==================== =============== ====================
+/// ==================== REQUEST PARSING ====================
+/// ==================== =============== ====================
 
-int32_t HttpRequest_TryParseStartLine(HttpRequest_t *req, uint8_t *data,
-                                      uint32_t startPos, uint32_t endPos);
-int32_t HttpRequest_TryParseHeaders(HttpRequest_t *req, uint8_t *data,
-                                    uint32_t startPos, uint32_t endPos);
-int32_t HttpRequest_AppendBody(HttpRequest_t *req, uint8_t *data,
-                               uint32_t startPos, uint32_t endPos);
+typedef enum {
+    Empty           = 0,
+    Error           = 1,
+    AwaitingHeaders = 2,
+    AwaitingBody    = 3,
+    Complete        = 4,
+} HttpRequestParsingState;
 
-int32_t HttpRequest_StartLineComplete(HttpRequest_t *req);
-int32_t HttpRequest_HeadersComplete(HttpRequest_t *req);
-int32_t HttpRequest_RequestComplete(HttpRequest_t *req);
+typedef struct {
+    HttpRequestParsingState state;
+    uint8_t *buffer;
+    uint32_t bufferLength;
+    int32_t lastProcessedByte;
+} HttpRequestStateInfo;
 
-NKString HttpRequest_GetStartLine(HttpRequest_t *req);
-NKString HttpRequest_GetHeaders(HttpRequest_t *req);
-NKString HttpRequest_GetBody(HttpRequest_t *req);
-
-HttpMethod HttpRequest_GetMethod(HttpRequest_t *req);
-NKString HttpRequest_GetTargetPath(HttpRequest_t *req);
-RequestParamArray HttpRequest_GetParams(HttpRequest_t *req);
-
-HttpRequestData HttpRequest_GetAllData(HttpRequest_t *req);
+int32_t TryParseHttpRequest(uint8_t *buffer, uint32_t bufferLength,
+                            HttpRequestStateInfo *info);
 
 #endif // NAZARK_INCLUDE_H
