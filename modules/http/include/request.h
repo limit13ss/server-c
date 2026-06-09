@@ -1,14 +1,9 @@
 #ifndef NAZARK_INCLUDE_H
 #define NAZARK_INCLUDE_H
 
-#include "client.h"
 #include "common.h"
 
 #include <stdint.h>
-
-/// ==================== ======= ====================
-/// ==================== REQUEST ====================
-/// ==================== ======= ====================
 
 typedef struct {
     NKString *params;
@@ -45,12 +40,6 @@ typedef struct {
     NKString body;
 } HttpRequest;
 
-HttpRequest *Request_Init(void);
-
-/// ==================== =============== ====================
-/// ==================== REQUEST PARSING ====================
-/// ==================== =============== ====================
-
-int32_t Request_TryParseBuffer(ClientContext *context);
+void Request_Free(HttpRequest *req);
 
 #endif // NAZARK_INCLUDE_H

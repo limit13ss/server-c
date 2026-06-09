@@ -1,17 +1,21 @@
 #ifndef NAZARK_CLIENT_H
 #define NAZARK_CLIENT_H
 
+#include "request.h"
+
 #include <stdint.h>
 
 #define REQUEST_HEADERS_BUFFER_SIZE 8192 // 8 KiB
 
 typedef enum {
-    Empty            = 0,
-    AwaitingHeaders  = 1,
-    AwaitingBody     = 2,
-    Complete         = 3,
-    GenericError     = 4,
-    LongHeadersError = 5,
+    Empty             = 0,
+    AwaitingStartLine = 1,
+    AwaitingHeaders   = 2,
+    AwaitingBody      = 3,
+    Complete          = 4,
+    GenericError      = 5,
+    LongHeadersError  = 6,
+    UnknownError      = -1
 } ClientParsingState;
 
 typedef struct {
@@ -20,14 +24,18 @@ typedef struct {
     uint32_t length;
 } ClientBuffer;
 
-typedef struct {
-    ClientBuffer *clientBuffer;
-    ClientParsingState state;
-    int32_t lastParsedByte;
-    uint32_t bodyExpectedLength;
-} ClientContext;
+typedef struct ClientContext ClientContext;
 
 ClientContext *Client_InitContext(void);
 void Client_FreeContext(ClientContext *ctx);
+
+ClientBuffer *Client_GetBuffer(ClientContext *ctx);
+
+/// ==================== =============== ====================
+/// ==================== REQUEST PARSING ====================
+/// ==================== =============== ====================
+
+ClientParsingState Request_TryParseHeaders(ClientContext *ctx);
+HttpRequest *Client_GetRequest(ClientContext *ctx);
 
 #endif // NAZARK_CLIENT_H

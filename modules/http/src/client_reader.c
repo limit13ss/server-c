@@ -1,6 +1,5 @@
 #include "client_reader.h"
 #include "client.h"
-#include "request.h"
 
 #include <errno.h>
 #include <stdint.h>
@@ -48,13 +47,13 @@ void freeContext(const int32_t fd) {
     g_clientContexts[fd] = NULL;
 }
 
-int32_t readFromClient(const int32_t fd) {
+int32_t readHeaders(const int32_t fd) {
     ClientContext *ctx = getContext(fd);
     if (ctx == NULL) {
         return -1;
     }
 
-    ClientBuffer *cb = ctx->clientBuffer;
+    ClientBuffer *cb = Client_GetBuffer(ctx);
     if (cb->length >= cb->capacity) {
         return -1;
     }
@@ -111,7 +110,7 @@ void *clientReaderRoutine(void *arg) {
                 return NULL;
             }
 
-            int32_t read = readFromClient(activeFd);
+            int32_t read = readHeaders(activeFd);
             if (read < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
                     continue;
@@ -127,7 +126,7 @@ void *clientReaderRoutine(void *arg) {
                 goto closeClient;
             }
 
-            Request_TryParseBuffer(getContext(activeFd));
+            Request_TryParseHeaders(getContext(activeFd));
 
             // TODO: parse here
             continue;
