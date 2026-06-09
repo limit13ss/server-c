@@ -1,4 +1,6 @@
 #include "client_reader.h"
+#include "client.h"
+#include "request.h"
 
 #include <errno.h>
 #include <stdint.h>
@@ -10,77 +12,58 @@
 
 #define EPOLL_WAIT_TIMEOUT_MS 500
 #define MAX_FDS 2048
-#define BUFFER_SIZE 16384 // 16 KiB
-
-typedef struct {
-    uint8_t *buffer;
-    uint32_t bufLen;
-    uint32_t startPos;
-} ClientBuffer;
 
 /// ===================== ======= =====================
 /// ===================== GLOBALS =====================
 /// ===================== ======= =====================
 
-ClientBuffer **g_clientsBuffers;
+ClientContext **g_clientContexts;
 
 /// ===================== ============ =====================
 /// ===================== CB FUNCTIONS =====================
 /// ===================== ============ =====================
 
-ClientBuffer *getBuffer(const int32_t fd) {
+ClientContext *getContext(const int32_t fd) {
     if (fd < 0) {
         return NULL;
     }
 
-    if (g_clientsBuffers[fd] == NULL) {
-        g_clientsBuffers[fd] = malloc(sizeof(ClientBuffer));
-
-        uint8_t *buf = calloc(BUFFER_SIZE, sizeof(uint8_t));
-        if (buf == NULL) {
-            free(g_clientsBuffers[fd]);
-            g_clientsBuffers[fd] = NULL;
-            return NULL;
-        }
-
-        *g_clientsBuffers[fd] = (ClientBuffer){ .buffer   = buf,
-                                                .bufLen   = BUFFER_SIZE,
-                                                .startPos = 0 };
+    if (g_clientContexts[fd] == NULL) {
+        g_clientContexts[fd] = Client_InitContext();
     }
 
-    return g_clientsBuffers[fd];
+    return g_clientContexts[fd];
 }
 
-void freeBuffer(const int32_t fd) {
+void freeContext(const int32_t fd) {
     if (fd < 0) {
         return;
     }
 
-    if (g_clientsBuffers[fd] == NULL) {
+    if (g_clientContexts[fd] == NULL) {
         return;
     }
 
-    free(g_clientsBuffers[fd]->buffer);
-    free(g_clientsBuffers[fd]);
-    g_clientsBuffers[fd] = NULL;
+    Client_FreeContext(g_clientContexts[fd]);
+    g_clientContexts[fd] = NULL;
 }
 
 int32_t readFromClient(const int32_t fd) {
-    ClientBuffer *cb = getBuffer(fd);
-    if (cb == NULL) {
+    ClientContext *ctx = getContext(fd);
+    if (ctx == NULL) {
         return -1;
     }
 
-    if (cb->startPos >= cb->bufLen) {
+    ClientBuffer *cb = ctx->clientBuffer;
+    if (cb->length >= cb->capacity) {
         return -1;
     }
 
-    void *startByte    = cb->buffer + cb->startPos;
-    uint32_t freeBytes = cb->bufLen - cb->startPos;
-    int32_t read       = (int32_t)recv(fd, startByte, freeBytes, 0);
+    int32_t read = (int32_t)recv(fd, cb->buffer + cb->length,
+                                 cb->capacity - cb->length, 0);
 
     if (read > 0) {
-        cb->startPos += (uint32_t)read;
+        cb->length += (uint32_t)read;
     }
     return read;
 }
@@ -95,8 +78,8 @@ void *clientReaderRoutine(void *arg) {
     }
 
     ClientReaderArg_t *crArg = (ClientReaderArg_t *)arg;
-    g_clientsBuffers         = calloc(MAX_FDS, sizeof(ClientBuffer *));
-    if (g_clientsBuffers == NULL) {
+    g_clientContexts         = calloc(MAX_FDS, sizeof(ClientBuffer *));
+    if (g_clientContexts == NULL) {
         fprintf(
             stderr,
             "[ERR] Client reader thread error - malloc(g_clientsBuffers).\n");
@@ -144,13 +127,13 @@ void *clientReaderRoutine(void *arg) {
                 goto closeClient;
             }
 
-            ClientBuffer *cb = getBuffer(activeFd);
-            fprintf(stdout, "%s", cb->buffer);
+            Request_TryParseBuffer(getContext(activeFd));
+
             // TODO: parse here
             continue;
 
         closeClient:
-            freeBuffer(activeFd);
+            freeContext(activeFd);
             epoll_ctl(epoll, EPOLL_CTL_DEL, activeFd, NULL);
             close(activeFd);
         }

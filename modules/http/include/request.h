@@ -1,7 +1,9 @@
 #ifndef NAZARK_INCLUDE_H
 #define NAZARK_INCLUDE_H
 
+#include "client.h"
 #include "common.h"
+
 #include <stdint.h>
 
 /// ==================== ======= ====================
@@ -43,28 +45,12 @@ typedef struct {
     NKString body;
 } HttpRequest;
 
-int32_t HttpRequest_Init(HttpRequest *req);
+HttpRequest *Request_Init(void);
 
 /// ==================== =============== ====================
 /// ==================== REQUEST PARSING ====================
 /// ==================== =============== ====================
 
-typedef enum {
-    Empty           = 0,
-    Error           = 1,
-    AwaitingHeaders = 2,
-    AwaitingBody    = 3,
-    Complete        = 4,
-} HttpRequestParsingState;
-
-typedef struct {
-    HttpRequestParsingState state;
-    uint8_t *buffer;
-    uint32_t bufferLength;
-    int32_t lastProcessedByte;
-} HttpRequestStateInfo;
-
-int32_t TryParseHttpRequest(uint8_t *buffer, uint32_t bufferLength,
-                            HttpRequestStateInfo *info);
+int32_t Request_TryParseBuffer(ClientContext *context);
 
 #endif // NAZARK_INCLUDE_H
