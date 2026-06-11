@@ -5,6 +5,22 @@
 
 #include <stdint.h>
 
+/// ==================== ========= ====================
+/// ==================== CONSTANTS ====================
+/// ==================== ========= ====================
+
+const uint8_t SPACE = ' ';
+
+const uint8_t HTTP_SEPARATOR[] = { '\r', '\n' };
+#define HTTP_SEPARATOR_LEN 2
+
+const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
+#define DOUBLE_HTTP_SEPARATOR_LEN 4
+
+/// ==================== ======= ====================
+/// ==================== STRUCTS ====================
+/// ==================== ======= ====================
+
 typedef struct {
     NKString *params;
     uint16_t count;
@@ -39,6 +55,10 @@ typedef struct {
     RequestHeaderArray headers;
     NKString body;
 } HttpRequest;
+
+/// ==================== ========= ====================
+/// ==================== FUNCTIONS ====================
+/// ==================== ========= ====================
 
 void Request_Free(HttpRequest *req);
 

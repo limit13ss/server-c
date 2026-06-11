@@ -11,10 +11,12 @@ typedef enum {
     Empty             = 0,
     AwaitingStartLine = 1,
     AwaitingHeaders   = 2,
-    AwaitingBody      = 3,
-    Complete          = 4,
-    GenericError      = 5,
-    LongHeadersError  = 6,
+    CompleteHeaders   = 3,
+    AwaitingBody      = 4,
+    Complete          = 5,
+    GenericError      = 6,
+    LongHeadersError  = 7,
+    BadRequestError   = 8,
     UnknownError      = -1
 } ClientParsingState;
 
