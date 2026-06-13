@@ -30,7 +30,6 @@ typedef struct ClientContext ClientContext;
 
 ClientContext *Client_InitContext(void);
 void Client_FreeContext(ClientContext *ctx);
-
 ClientBuffer *Client_GetBuffer(ClientContext *ctx);
 
 /// ==================== =============== ====================

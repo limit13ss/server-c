@@ -9,12 +9,12 @@
 /// ==================== CONSTANTS ====================
 /// ==================== ========= ====================
 
-const uint8_t SPACE = ' ';
+static const uint8_t SPACE = ' ';
 
-const uint8_t HTTP_SEPARATOR[] = { '\r', '\n' };
+static const uint8_t HTTP_SEPARATOR[] = { '\r', '\n' };
 #define HTTP_SEPARATOR_LEN 2
 
-const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
+static const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 #define DOUBLE_HTTP_SEPARATOR_LEN 4
 
 /// ==================== ======= ====================
@@ -22,9 +22,12 @@ const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 /// ==================== ======= ====================
 
 typedef struct {
-    NKString *params;
+    NKString *values;
     uint16_t count;
 } RequestParamArray;
+
+RequestParamArray RequestParamArray_Empty(void);
+int8_t RequestParamArray_IsEmpty(RequestParamArray value);
 
 typedef struct {
     NKString key;
@@ -32,9 +35,12 @@ typedef struct {
 } RequestHeader;
 
 typedef struct {
-    RequestHeader *headers;
+    RequestHeader *values;
     uint16_t count;
 } RequestHeaderArray;
+
+RequestHeaderArray RequestHeaderArray_Empty(void);
+int8_t RequestHeaderArray_IsEmpty(RequestHeaderArray value);
 
 typedef enum {
     GET     = 0,
@@ -45,13 +51,19 @@ typedef enum {
     CONNECT = 5,
     HEAD    = 6,
     OPTIONS = 7,
-    TRACE   = 8
+    TRACE   = 8,
+    EMPTY   = -1
 } HttpMethod;
 
 typedef struct {
     HttpMethod method;
     NKString targetPath;
     RequestParamArray params;
+    NKString protocol;
+} RequestStartLine;
+
+typedef struct {
+    RequestStartLine startLine;
     RequestHeaderArray headers;
     NKString body;
 } HttpRequest;
@@ -60,6 +72,7 @@ typedef struct {
 /// ==================== FUNCTIONS ====================
 /// ==================== ========= ====================
 
+HttpRequest *Request_Init(void);
 void Request_Free(HttpRequest *req);
 
 #endif // NAZARK_INCLUDE_H

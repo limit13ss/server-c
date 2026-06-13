@@ -14,4 +14,9 @@ typedef struct {
     uint64_t len;
 } NKString;
 
+NKString NKString_Empty(void);
+int8_t NKString_IsEmpty(NKString value);
+
+void NKString_Free(NKString str);
+
 #endif // NAZARK_COMMON_H

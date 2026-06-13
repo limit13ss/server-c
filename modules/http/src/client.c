@@ -10,6 +10,10 @@ typedef struct {
     int64_t endPos;
 } Range;
 
+int8_t Range_IsInitial(Range value) {
+    return value.startPos == -1 || value.endPos == -1;
+}
+
 struct ClientContext {
     ClientBuffer *clientBuffer;
     ClientParsingState state;
@@ -19,22 +23,18 @@ struct ClientContext {
     HttpRequest *request;
 };
 
-int8_t isDefaultRange(Range range) {
-    return range.endPos == -1 && range.startPos == -1;
-}
-
 /// ==================== ========== ====================
 /// ==================== Public Api ====================
 /// ==================== ========== ====================
 
 ClientBuffer *initClientBuffer(void) {
     uint8_t *buf = calloc(REQUEST_HEADERS_BUFFER_SIZE, sizeof(uint8_t));
-    if (buf == NULL) {
+    if (!buf) {
         return NULL;
     }
 
     ClientBuffer *cb = calloc(1, sizeof(ClientBuffer));
-    if (cb == NULL) {
+    if (!cb) {
         free(buf);
         return NULL;
     }
@@ -46,12 +46,12 @@ ClientBuffer *initClientBuffer(void) {
 
 ClientContext *Client_InitContext(void) {
     ClientContext *ctx = calloc(1, sizeof(ClientContext));
-    if (ctx == NULL) {
+    if (!ctx) {
         return NULL;
     }
 
     ClientBuffer *cb = initClientBuffer();
-    if (cb == NULL) {
+    if (cb) {
         free(ctx);
         return NULL;
     }
@@ -67,14 +67,14 @@ ClientContext *Client_InitContext(void) {
 }
 
 void Client_FreeContext(ClientContext *ctx) {
-    if (ctx == NULL) {
+    if (!ctx) {
         return;
     }
 
     free(ctx->clientBuffer->buffer);
     free(ctx->clientBuffer);
 
-    if (ctx->request != NULL) {
+    if (ctx->request) {
         Request_Free(ctx->request);
     }
     free(ctx);
@@ -155,13 +155,39 @@ int32_t findHeaders(ClientContext *ctx) {
     return 0;
 }
 
-int32_t parseStartLine(ClientContext *ctx) { return -1; }
+int32_t parseStartLine(ClientContext *ctx) {
+    if (!ctx->request) {
+        ctx->state = BadRequestError;
+        return -1;
+    }
+    if (Range_IsInitial(ctx->startLineRange)) {
+        ctx->state = BadRequestError;
+        return -1;
+    }
 
-int32_t parseHeaders(ClientContext *ctx) { return -1; }
+    // TODO: implement
+
+    return -1;
+}
+
+int32_t parseHeaders(ClientContext *ctx) {
+    if (!ctx->request) {
+        ctx->state = BadRequestError;
+        return -1;
+    }
+    if (Range_IsInitial(ctx->headersRange)) {
+        ctx->state = BadRequestError;
+        return -1;
+    }
+
+    // TODO: implement
+
+    return -1;
+}
 
 int32_t initRequest(ClientContext *ctx) {
-    ctx->request = calloc(1, sizeof(HttpRequest));
-    if (ctx->request == NULL) {
+    ctx->request = Request_Init();
+    if (!ctx->request) {
         return -1;
     }
 
@@ -207,8 +233,7 @@ ClientParsingState Request_TryParseHeaders(ClientContext *ctx) {
         }
 
         case CompleteHeaders: {
-            if (initRequest(ctx) != 0 || parseStartLine(ctx) != 0 ||
-                parseHeaders(ctx) != 0) {
+            if (initRequest(ctx) || parseStartLine(ctx) || parseHeaders(ctx)) {
                 ctx->state = BadRequestError;
             }
             break;
