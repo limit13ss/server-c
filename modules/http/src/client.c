@@ -92,7 +92,7 @@ HttpRequest *Client_GetRequest(ClientContext *ctx) {
     if (ctx == NULL) {
         return NULL;
     }
-    if (ctx->state != Complete) {
+    if (ctx->state != Complete && ctx->state != AwaitingBody) {
         return NULL;
     }
 
