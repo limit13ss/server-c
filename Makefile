@@ -1,17 +1,17 @@
 CC = gcc
 
-MOD_HTTP_INCLUDE = modules/http/include
-MOD_HTTP_SRC = modules/http/src
+HTTP_INCLUDE = modules/http/include
+HTTP_SRC = modules/http/src
 
-MOD_UTIL_INCLUDE = modules/utility/include
-MOD_UTIL_SRC = modules/utility/src
-MOD_UTIL_TESTS = modules/utility/tests
+UTILITY_INCLUDE = modules/utility/include
+UTILITY_SRC = modules/utility/src
+UTILITY_TESTS = modules/utility/tests
 
 CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion -D_POSIX_C_SOURCE=200809L
-ALL_CFLAGS = $(CFLAGS) -I$(MOD_HTTP_INCLUDE) -I$(MOD_UTIL_INCLUDE)
+ALL_CFLAGS = $(CFLAGS) -I$(HTTP_INCLUDE) -I$(UTILITY_INCLUDE)
 DEBUG_CFLAGS = -g
 
-SRC = $(wildcard $(MOD_HTTP_SRC)/*.c $(MOD_UTIL_SRC)/*.c)
+SRC = $(wildcard $(HTTP_SRC)/*.c $(UTILITY_SRC)/*.c)
 OBJ = $(SRC:.c=.o)
 OUT = out
 OUT_TEST = test
@@ -31,11 +31,17 @@ clean:
 	rm -rf ./$(OUT) ./$(OUT_TEST) 
 
 test-ring-buffer:
-	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/generic_ring_buffer_test.c -o ./$(OUT_TEST)/$@
+	mkdir -p ./$(OUT_TEST)
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_generic_ring_buffer.c -o ./$(OUT_TEST)/$@
 
 test-queue:
 	mkdir -p ./$(OUT_TEST)
-	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/queue_test.c $(MOD_UTIL_SRC)/queue.c -o ./$(OUT_TEST)/$@
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_queue.c $(UTILITY_SRC)/queue.c -o ./$(OUT_TEST)/$@
 
 test-thread-pool:
-	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(MOD_UTIL_INCLUDE) $(MOD_UTIL_TESTS)/thread_pool_test.c $(MOD_UTIL_SRC)/thread_pool.c $(MOD_UTIL_SRC)/queue.c -o ./$(OUT_TEST)/$@
+	mkdir -p ./$(OUT_TEST)
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_thread_pool.c $(UTILITY_SRC)/thread_pool.c $(UTILITY_SRC)/queue.c -o ./$(OUT_TEST)/$@
+
+test-array-util:
+	mkdir -p ./$(OUT_TEST)
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_array_utils.c $(UTILITY_SRC)/array_utils.c -o ./$(OUT_TEST)/$@

@@ -1,3 +1,4 @@
+#include "test_common.h"
 #include "thread_pool.h"
 
 #include <assert.h>
@@ -465,14 +466,6 @@ void testConcurrency_SlowTasks_FreeNoWait(void) {
 // ---------------------------------------------------------------------------
 
 int main(void) {
-
-#define RUN(t)                                                                 \
-    do {                                                                       \
-        printf("[TEST] %-55s", #t);                                            \
-        t();                                                                   \
-        printf("PASS\n");                                                      \
-    } while (0)
-
     RUN(testCreate_ZeroWorkers);
     RUN(testCreate_Valid);
     RUN(testCreate_SingleWorker);
