@@ -14,6 +14,12 @@ typedef struct {
     uint64_t len;
 } NKString;
 
+typedef struct {
+    uint8_t *values;
+    uint32_t capacity;
+    uint32_t length;
+} NKBuffer;
+
 NKString NKString_Empty(void);
 int8_t NKString_IsEmpty(NKString value);
 

@@ -1,5 +1,5 @@
 #include "client_reader.h"
-#include "client.h"
+#include "client_parser.h"
 
 #include <errno.h>
 #include <stdint.h>
@@ -16,22 +16,22 @@
 /// ===================== GLOBALS =====================
 /// ===================== ======= =====================
 
-ClientContext **g_clientContexts;
+ParserContext **g_parserContexts;
 
 /// ===================== ============ =====================
 /// ===================== CB FUNCTIONS =====================
 /// ===================== ============ =====================
 
-ClientContext *getContext(const int32_t fd) {
+ParserContext *getContext(const int32_t fd) {
     if (fd < 0) {
         return NULL;
     }
 
-    if (g_clientContexts[fd] == NULL) {
-        g_clientContexts[fd] = Client_InitContext();
+    if (g_parserContexts[fd] == NULL) {
+        g_parserContexts[fd] = ParserContext_Init();
     }
 
-    return g_clientContexts[fd];
+    return g_parserContexts[fd];
 }
 
 void freeContext(const int32_t fd) {
@@ -39,30 +39,30 @@ void freeContext(const int32_t fd) {
         return;
     }
 
-    if (g_clientContexts[fd] == NULL) {
+    if (g_parserContexts[fd] == NULL) {
         return;
     }
 
-    Client_FreeContext(g_clientContexts[fd]);
-    g_clientContexts[fd] = NULL;
+    ParserContext_Free(g_parserContexts[fd]);
+    g_parserContexts[fd] = NULL;
 }
 
 int32_t readHeaders(const int32_t fd) {
-    ClientContext *ctx = getContext(fd);
+    ParserContext *ctx = getContext(fd);
     if (ctx == NULL) {
         return -1;
     }
 
-    ClientBuffer *cb = Client_GetBuffer(ctx);
-    if (cb->length >= cb->capacity) {
+    NKBuffer *buf = ParserContext_GetBuffer(ctx);
+    if (buf->length >= buf->capacity) {
         return -1;
     }
 
-    int32_t read = (int32_t)recv(fd, cb->buffer + cb->length,
-                                 cb->capacity - cb->length, 0);
+    int32_t read = (int32_t)recv(fd, buf->values + buf->length,
+                                 buf->capacity - buf->length, 0);
 
     if (read > 0) {
-        cb->length += (uint32_t)read;
+        buf->length += (uint32_t)read;
     }
     return read;
 }
@@ -77,8 +77,8 @@ void *clientReaderRoutine(void *arg) {
     }
 
     ClientReaderArg_t *crArg = (ClientReaderArg_t *)arg;
-    g_clientContexts         = calloc(MAX_FDS, sizeof(ClientBuffer *));
-    if (g_clientContexts == NULL) {
+    g_parserContexts         = calloc(MAX_FDS, sizeof(NKBuffer *));
+    if (g_parserContexts == NULL) {
         fprintf(
             stderr,
             "[ERR] Client reader thread error - malloc(g_clientsBuffers).\n");
@@ -126,7 +126,7 @@ void *clientReaderRoutine(void *arg) {
                 goto closeClient;
             }
 
-            Request_TryParseHeaders(getContext(activeFd));
+            Parser_TryParseHeaders(getContext(activeFd));
 
             // TODO: parse here
             continue;

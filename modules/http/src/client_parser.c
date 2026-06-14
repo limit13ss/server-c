@@ -1,4 +1,4 @@
-#include "client.h"
+#include "client_parser.h"
 #include "array_utils.h"
 #include "request.h"
 
@@ -14,9 +14,9 @@ int8_t Range_IsInitial(Range value) {
     return value.startPos == -1 || value.endPos == -1;
 }
 
-struct ClientContext {
-    ClientBuffer *clientBuffer;
-    ClientParsingState state;
+struct ParserContext {
+    NKBuffer *buffer;
+    ParsingState state;
     Range startLineRange;
     Range headersRange;
     uint32_t bodyExpectedLength;
@@ -27,37 +27,37 @@ struct ClientContext {
 /// ==================== Public Api ====================
 /// ==================== ========== ====================
 
-ClientBuffer *initClientBuffer(void) {
+NKBuffer *initNKBuffer(void) {
     uint8_t *buf = calloc(REQUEST_HEADERS_BUFFER_SIZE, sizeof(uint8_t));
     if (!buf) {
         return NULL;
     }
 
-    ClientBuffer *cb = calloc(1, sizeof(ClientBuffer));
+    NKBuffer *cb = calloc(1, sizeof(NKBuffer));
     if (!cb) {
         free(buf);
         return NULL;
     }
-    *cb = (ClientBuffer){ .buffer   = buf,
-                          .capacity = REQUEST_HEADERS_BUFFER_SIZE,
-                          .length   = 0 };
+    *cb = (NKBuffer){ .values   = buf,
+                      .capacity = REQUEST_HEADERS_BUFFER_SIZE,
+                      .length   = 0 };
     return cb;
 }
 
-ClientContext *Client_InitContext(void) {
-    ClientContext *ctx = calloc(1, sizeof(ClientContext));
+ParserContext *ParserContext_Init(void) {
+    ParserContext *ctx = calloc(1, sizeof(ParserContext));
     if (!ctx) {
         return NULL;
     }
 
-    ClientBuffer *cb = initClientBuffer();
-    if (cb) {
+    NKBuffer *buffer = initNKBuffer();
+    if (buffer) {
         free(ctx);
         return NULL;
     }
 
     ctx->state              = Empty;
-    ctx->clientBuffer       = cb;
+    ctx->buffer             = buffer;
     ctx->startLineRange     = (Range){ .startPos = -1, .endPos = -1 };
     ctx->headersRange       = (Range){ .startPos = -1, .endPos = -1 };
     ctx->bodyExpectedLength = 0;
@@ -66,13 +66,13 @@ ClientContext *Client_InitContext(void) {
     return ctx;
 }
 
-void Client_FreeContext(ClientContext *ctx) {
+void ParserContext_Free(ParserContext *ctx) {
     if (!ctx) {
         return;
     }
 
-    free(ctx->clientBuffer->buffer);
-    free(ctx->clientBuffer);
+    free(ctx->buffer->values);
+    free(ctx->buffer);
 
     if (ctx->request) {
         Request_Free(ctx->request);
@@ -80,15 +80,15 @@ void Client_FreeContext(ClientContext *ctx) {
     free(ctx);
 }
 
-ClientBuffer *Client_GetBuffer(ClientContext *ctx) {
+NKBuffer *ParserContext_GetBuffer(ParserContext *ctx) {
     if (ctx == NULL) {
         return NULL;
     }
 
-    return ctx->clientBuffer;
+    return ctx->buffer;
 }
 
-HttpRequest *Client_GetRequest(ClientContext *ctx) {
+HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
     if (ctx == NULL) {
         return NULL;
     }
@@ -103,8 +103,8 @@ HttpRequest *Client_GetRequest(ClientContext *ctx) {
 /// ==================== REQUEST PARSING ====================
 /// ==================== =============== ====================
 
-int32_t findStartLine(ClientContext *ctx) {
-    ClientBuffer *cb = ctx->clientBuffer;
+int32_t findStartLine(ParserContext *ctx) {
+    NKBuffer *cb = ctx->buffer;
 
     if (cb->length <= 0) {
         return -1;
@@ -115,7 +115,7 @@ int32_t findStartLine(ClientContext *ctx) {
     }
 
     int64_t lineEndPos =
-        indexOfSeq(cb->buffer, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
+        indexOfSeq(cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
 
     if (lineEndPos == -1) {
         return -1;
@@ -129,8 +129,8 @@ int32_t findStartLine(ClientContext *ctx) {
     return 0;
 }
 
-int32_t findHeaders(ClientContext *ctx) {
-    ClientBuffer *cb = ctx->clientBuffer;
+int32_t findHeaders(ParserContext *ctx) {
+    NKBuffer *cb = ctx->buffer;
 
     if (cb->length <= 0) {
         return -1;
@@ -141,7 +141,7 @@ int32_t findHeaders(ClientContext *ctx) {
     }
 
     int64_t headEndPos = indexOfSeqOff(
-        cb->buffer, cb->length, DOUBLE_HTTP_SEPARATOR,
+        cb->values, cb->length, DOUBLE_HTTP_SEPARATOR,
         DOUBLE_HTTP_SEPARATOR_LEN, (uint32_t)ctx->headersRange.startPos);
 
     if (headEndPos == -1 && cb->length >= cb->capacity) {
@@ -155,7 +155,7 @@ int32_t findHeaders(ClientContext *ctx) {
     return 0;
 }
 
-int32_t parseStartLine(ClientContext *ctx) {
+int32_t parseStartLine(ParserContext *ctx) {
     if (!ctx->request) {
         ctx->state = BadRequestError;
         return -1;
@@ -170,7 +170,7 @@ int32_t parseStartLine(ClientContext *ctx) {
     return -1;
 }
 
-int32_t parseHeaders(ClientContext *ctx) {
+int32_t parseHeaders(ParserContext *ctx) {
     if (!ctx->request) {
         ctx->state = BadRequestError;
         return -1;
@@ -185,7 +185,7 @@ int32_t parseHeaders(ClientContext *ctx) {
     return -1;
 }
 
-int32_t initRequest(ClientContext *ctx) {
+int32_t initRequest(ParserContext *ctx) {
     ctx->request = Request_Init();
     if (!ctx->request) {
         return -1;
@@ -194,14 +194,14 @@ int32_t initRequest(ClientContext *ctx) {
     return 0;
 }
 
-ClientParsingState Request_TryParseHeaders(ClientContext *ctx) {
+ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
     if (ctx == NULL) {
         return UnknownError;
     }
-    if (ctx->clientBuffer == NULL) {
+    if (ctx->buffer == NULL) {
         return UnknownError;
     }
-    if (ctx->clientBuffer->buffer == NULL) {
+    if (ctx->buffer->values == NULL) {
         return UnknownError;
     }
 
