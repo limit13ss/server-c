@@ -8,30 +8,37 @@ UTILITY_INCLUDE = modules/utility/include
 UTILITY_SRC = modules/utility/src
 UTILITY_TESTS = modules/utility/tests
 
-OUT_TEST = test
-MK_OUT_TEST = mkdir -p ./$(OUT_TEST)
+APP_INCLUDE = modules/app/include
+APP_SRC = modules/app/src
 
 CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion -D_POSIX_C_SOURCE=200809L
-ALL_CFLAGS = $(CFLAGS) -I$(HTTP_INCLUDE) -I$(UTILITY_INCLUDE)
+ICFLAGS = $(CFLAGS) -I$(HTTP_INCLUDE) -I$(UTILITY_INCLUDE) -I$(APP_INCLUDE)
 DEBUG_CFLAGS = -g
 
-SRC = $(wildcard $(HTTP_SRC)/*.c $(UTILITY_SRC)/*.c)
+SRC = $(wildcard $(HTTP_SRC)/*.c $(UTILITY_SRC)/*.c $(APP_SRC)/*.c)
 OBJ = $(SRC:.c=.o)
+
+CLIENT_PARSER_SRC = $(wildcard $(HTTP_SRC)/*.c $(UTILITY_SRC)/*.c $(HTTP_TESTS)/test_client_parser.c)
+CLIENT_PARSER_OBJ = $(CLIENT_PARSER_SRC:.c=.o.test)
+
 OUT = out
+OUT_TEST = test
+MK_OUT_TEST = mkdir -p ./$(OUT_TEST)
 
 application: $(OBJ)
 	mkdir -p ./$(OUT)
 	$(CC) $(OBJ) -o ./$(OUT)/$@
 
 %.o: %.c
-	$(CC) $(ALL_CFLAGS) -c $< -o $@
+	$(CC) $(ICFLAGS) -c $< -o $@
 
 compile-flags:
-	echo "$(ALL_CFLAGS)" | tr ' ' '\n' > compile_flags.txt
+	echo "$(ICFLAGS)" | tr ' ' '\n' > compile_flags.txt
 
 clean:
 	rm -f $(OBJ) ./compile_flags.txt
-	rm -rf ./$(OUT) ./$(OUT_TEST) 
+	rm -f $(CLIENT_PARSER_OBJ)
+	rm -rf ./$(OUT) ./$(OUT_TEST)
 
 test-ring-buffer:
 	$(MK_OUT_TEST)
@@ -48,3 +55,10 @@ test-thread-pool:
 test-array-util:
 	$(MK_OUT_TEST)
 	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_array_utils.c $(UTILITY_SRC)/array_utils.c -o ./$(OUT_TEST)/$@
+
+%.o.test: %.c
+	$(CC) $(ICFLAGS) $(DEBUG_CFLAGS) -c $< -o $@
+
+test-client-parser: $(CLIENT_PARSER_OBJ)
+	$(MK_OUT_TEST)
+	$(CC) $(CLIENT_PARSER_OBJ) -o ./$(OUT_TEST)/$@

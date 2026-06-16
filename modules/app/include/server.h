@@ -7,6 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-int32_t server_run(void);
+int32_t server_Run(void);
 
 #endif // NAZARK_SERVER_H

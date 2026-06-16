@@ -126,9 +126,13 @@ void *clientReaderRoutine(void *arg) {
                 goto closeClient;
             }
 
-            Parser_TryParseHeaders(getContext(activeFd));
+            ParsingState currentState =
+                Parser_TryParseHeaders(getContext(activeFd));
 
-            // TODO: parse here
+            if (currentState) {
+                // TODO: act based on ctx->state
+            }
+
             continue;
 
         closeClient:

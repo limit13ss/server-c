@@ -17,9 +17,9 @@ int8_t Range_IsInitial(Range value) {
 struct ParserContext {
     NKBuffer *buffer;
     ParsingState state;
+    uint32_t bodyExpectedLength;
     Range startLineRange;
     Range headersRange;
-    uint32_t bodyExpectedLength;
     HttpRequest *request;
 };
 
@@ -51,7 +51,7 @@ ParserContext *ParserContext_Init(void) {
     }
 
     NKBuffer *buffer = initNKBuffer();
-    if (buffer) {
+    if (!buffer) {
         free(ctx);
         return NULL;
     }
@@ -144,9 +144,23 @@ int32_t findHeaders(ParserContext *ctx) {
         cb->values, cb->length, DOUBLE_HTTP_SEPARATOR,
         DOUBLE_HTTP_SEPARATOR_LEN, (uint32_t)ctx->headersRange.startPos);
 
-    if (headEndPos == -1 && cb->length >= cb->capacity) {
-        ctx->state = LongHeadersError;
-        return -1;
+    if (headEndPos == -1) {
+        if (cb->length >= cb->capacity) {
+            ctx->state = LongHeadersError;
+            return -1;
+        }
+
+        int64_t separatorIdx = indexOfSeqOff(
+            cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN,
+            (uint32_t)ctx->headersRange.startPos);
+
+        // case: request without single header
+        if (separatorIdx == ctx->headersRange.startPos) {
+            ctx->headersRange.startPos = -1;
+            ctx->headersRange.endPos   = -1;
+            ctx->state                 = CompleteHeaders;
+            return 0;
+        }
     }
 
     ctx->headersRange.endPos = headEndPos - 1;
@@ -160,6 +174,7 @@ int32_t parseStartLine(ParserContext *ctx) {
         ctx->state = BadRequestError;
         return -1;
     }
+
     if (Range_IsInitial(ctx->startLineRange)) {
         ctx->state = BadRequestError;
         return -1;
@@ -175,9 +190,11 @@ int32_t parseHeaders(ParserContext *ctx) {
         ctx->state = BadRequestError;
         return -1;
     }
+
+    // case: no headers at all
     if (Range_IsInitial(ctx->headersRange)) {
-        ctx->state = BadRequestError;
-        return -1;
+        ctx->state = Complete;
+        return 0;
     }
 
     // TODO: implement
@@ -186,6 +203,10 @@ int32_t parseHeaders(ParserContext *ctx) {
 }
 
 int32_t initRequest(ParserContext *ctx) {
+    if (ctx->request) {
+        return 0;
+    }
+
     ctx->request = Request_Init();
     if (!ctx->request) {
         return -1;
@@ -219,14 +240,14 @@ ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
         }
 
         case AwaitingStartLine: {
-            if (findStartLine(ctx) != 0) {
+            if (findStartLine(ctx)) {
                 goto returnLabel;
             }
             break;
         }
 
         case AwaitingHeaders: {
-            if (findHeaders(ctx) != 0) {
+            if (findHeaders(ctx)) {
                 goto returnLabel;
             }
             break;

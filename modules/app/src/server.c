@@ -133,7 +133,7 @@ int32_t mainLoopAction(int32_t mainSocketFd) {
     return 0;
 }
 
-int32_t server_run(void) {
+int32_t server_Run(void) {
     int32_t returnCode = 0;
 
     struct sigaction sa = { .sa_handler = handleProcSignal,
