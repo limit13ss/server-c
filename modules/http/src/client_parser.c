@@ -1,8 +1,12 @@
 #include "client_parser.h"
 #include "array_utils.h"
+#include "common.h"
+#include "linked_list.h"
 #include "request.h"
 
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 // both are inclusive
 typedef struct {
@@ -10,12 +14,10 @@ typedef struct {
     int64_t endPos;
 } Range;
 
-int8_t Range_IsInitial(Range value) {
-    return value.startPos == -1 || value.endPos == -1;
-}
+int8_t Range_IsEmpty(Range value) { return value.startPos >= value.endPos; }
 
 struct ParserContext {
-    NKBuffer *buffer;
+    NKBuffer buffer;
     ParsingState state;
     uint32_t bodyExpectedLength;
     Range startLineRange;
@@ -27,21 +29,15 @@ struct ParserContext {
 /// ==================== Public Api ====================
 /// ==================== ========== ====================
 
-NKBuffer *initNKBuffer(void) {
+NKBuffer initNKBuffer(void) {
     uint8_t *buf = calloc(REQUEST_HEADERS_BUFFER_SIZE, sizeof(uint8_t));
     if (!buf) {
-        return NULL;
+        return NKBuffer_Empty();
     }
 
-    NKBuffer *cb = calloc(1, sizeof(NKBuffer));
-    if (!cb) {
-        free(buf);
-        return NULL;
-    }
-    *cb = (NKBuffer){ .values   = buf,
-                      .capacity = REQUEST_HEADERS_BUFFER_SIZE,
-                      .length   = 0 };
-    return cb;
+    return (NKBuffer){ .values   = buf,
+                       .capacity = REQUEST_HEADERS_BUFFER_SIZE,
+                       .length   = 0 };
 }
 
 ParserContext *ParserContext_Init(void) {
@@ -50,14 +46,8 @@ ParserContext *ParserContext_Init(void) {
         return NULL;
     }
 
-    NKBuffer *buffer = initNKBuffer();
-    if (!buffer) {
-        free(ctx);
-        return NULL;
-    }
-
     ctx->state              = Empty;
-    ctx->buffer             = buffer;
+    ctx->buffer             = initNKBuffer();
     ctx->startLineRange     = (Range){ .startPos = -1, .endPos = -1 };
     ctx->headersRange       = (Range){ .startPos = -1, .endPos = -1 };
     ctx->bodyExpectedLength = 0;
@@ -71,25 +61,21 @@ void ParserContext_Free(ParserContext *ctx) {
         return;
     }
 
-    free(ctx->buffer->values);
-    free(ctx->buffer);
+    NKBuffer_Free(ctx->buffer);
 
-    if (ctx->request) {
-        Request_Free(ctx->request);
-    }
     free(ctx);
 }
 
 NKBuffer *ParserContext_GetBuffer(ParserContext *ctx) {
-    if (ctx == NULL) {
+    if (!ctx) {
         return NULL;
     }
 
-    return ctx->buffer;
+    return &ctx->buffer;
 }
 
 HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
-    if (ctx == NULL) {
+    if (!ctx) {
         return NULL;
     }
     if (ctx->state != Complete && ctx->state != AwaitingBody) {
@@ -104,7 +90,7 @@ HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
 /// ==================== =============== ====================
 
 int32_t findStartLine(ParserContext *ctx) {
-    NKBuffer *cb = ctx->buffer;
+    NKBuffer *cb = &ctx->buffer;
 
     if (cb->length <= 0) {
         return -1;
@@ -130,7 +116,7 @@ int32_t findStartLine(ParserContext *ctx) {
 }
 
 int32_t findHeaders(ParserContext *ctx) {
-    NKBuffer *cb = ctx->buffer;
+    NKBuffer *cb = &ctx->buffer;
 
     if (cb->length <= 0) {
         return -1;
@@ -140,7 +126,7 @@ int32_t findHeaders(ParserContext *ctx) {
         return -1;
     }
 
-    int64_t headEndPos = indexOfSeqOff(
+    int64_t headEndPos = indexOfSeqSkip(
         cb->values, cb->length, DOUBLE_HTTP_SEPARATOR,
         DOUBLE_HTTP_SEPARATOR_LEN, (uint32_t)ctx->headersRange.startPos);
 
@@ -150,7 +136,7 @@ int32_t findHeaders(ParserContext *ctx) {
             return -1;
         }
 
-        int64_t separatorIdx = indexOfSeqOff(
+        int64_t separatorIdx = indexOfSeqSkip(
             cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN,
             (uint32_t)ctx->headersRange.startPos);
 
@@ -169,20 +155,146 @@ int32_t findHeaders(ParserContext *ctx) {
     return 0;
 }
 
+void freeKeyValuePair(void *arg) {
+    if (!arg) {
+        return;
+    }
+    KeyValuePair *pair = (KeyValuePair *)arg;
+    NKString_Free(pair->key);
+    NKString_Free(pair->value);
+}
+
+RequestParamArray parseParams(const uint8_t *data, uint64_t dataLen) {
+    if (!data || !dataLen) {
+        return RequestParamArray_Empty();
+    }
+
+    LinkedList_t *paramsList = LinkedList_Create(freeKeyValuePair);
+    if (!paramsList) {
+        return RequestParamArray_Empty();
+    }
+
+    KeyValuePair *pair = NULL;
+
+    char *query = (char *)data;
+    char *token = strtok(query, "&");
+    while (token) {
+        NKString key   = NKString_Empty();
+        NKString value = NKString_Empty();
+
+        uint64_t tokenOff   = (uint64_t)token;
+        uint64_t tokenLen   = 0;
+        uint64_t eqOff      = (uint64_t)strchr(token, '=');
+        uint64_t nextAndOff = (uint64_t)strchr(token, '&');
+
+        if (nextAndOff >= tokenOff) {
+            tokenLen = nextAndOff - tokenOff;
+        } else {
+            tokenLen = dataLen - tokenOff;
+        }
+
+        if (eqOff > tokenOff) {
+            key = NKString_CopyFrom(token, eqOff - tokenOff);
+            if (eqOff < tokenLen) {
+                value = NKString_CopyFrom(token + eqOff + 1, tokenLen - eqOff);
+            } else {
+                value = NKString_Empty();
+            }
+        } else {
+            key = NKString_CopyFrom(token, tokenLen);
+        }
+
+        pair = calloc(1, sizeof(KeyValuePair));
+        if (!pair) {
+            NKString_Free(key);
+            NKString_Free(value);
+            goto freeListReturnEmpty;
+        }
+
+        pair->key   = key;
+        pair->value = value;
+        if (!LinkedList_AddEnd(paramsList, pair)) {
+            NKString_Free(key);
+            NKString_Free(value);
+            goto freeListReturnEmpty;
+        }
+    }
+
+    uint64_t paramsCount = 0;
+    if (!LinkedList_Length(paramsList, &paramsCount) ||
+        paramsCount > UINT16_MAX) {
+        goto freeListReturnEmpty;
+    }
+    KeyValuePair *arr = calloc(paramsCount, sizeof(KeyValuePair));
+    if (!arr) {
+        goto freeListReturnEmpty;
+    }
+
+    uint16_t i            = 0;
+    KeyValuePair *outPair = NULL;
+    while (LinkedList_PopStart(paramsList, (void **)&outPair)) {
+        arr[i] = *outPair;
+        ++i;
+    }
+
+    return (RequestParamArray){ .values = arr, .count = (uint16_t)paramsCount };
+
+freeListReturnEmpty:
+    LinkedList_Free(paramsList);
+    return RequestParamArray_Empty();
+}
+
 int32_t parseStartLine(ParserContext *ctx) {
     if (!ctx->request) {
-        ctx->state = BadRequestError;
         return -1;
     }
 
-    if (Range_IsInitial(ctx->startLineRange)) {
-        ctx->state = BadRequestError;
+    if (Range_IsEmpty(ctx->startLineRange)) {
         return -1;
     }
 
-    // TODO: implement
+    NKBuffer *buf          = &ctx->buffer;
+    RequestStartLine *line = &ctx->request->startLine;
 
-    return -1;
+    int64_t lIdx = 0, rIdx = 0;
+    rIdx = indexOf(buf->values, buf->length, SPACE);
+    if (rIdx < lIdx || rIdx > UINT8_MAX) {
+        return -1;
+    }
+
+    line->method = MethodFromString((const char *)buf->values, (uint8_t)rIdx);
+    if (line->method == UNKNOWN) {
+        return -1;
+    }
+
+    lIdx = rIdx + 1;
+    rIdx = indexOfSkip(buf->values, buf->length, SPACE, (uint32_t)lIdx);
+    if (rIdx <= lIdx || rIdx > UINT16_MAX) {
+        return -1;
+    }
+
+    int64_t paramsIdx =
+        indexOfSkip(buf->values, buf->length, '?', (uint32_t)lIdx);
+    if (paramsIdx == -1) {
+        line->targetPath = NKString_CopyFrom((const char *)buf->values + lIdx,
+                                             (uint64_t)(rIdx - lIdx));
+    } else {
+        line->targetPath = NKString_CopyFrom((const char *)buf->values + lIdx,
+                                             (uint64_t)(paramsIdx - lIdx));
+        line->params     = parseParams(buf->values + paramsIdx + 1,
+                                       (uint64_t)(rIdx - paramsIdx - 1));
+    }
+    lIdx = rIdx + 1;
+
+    rIdx = indexOfSkip(buf->values, buf->length, HTTP_SEPARATOR[0],
+                       (uint32_t)lIdx);
+    if (rIdx <= lIdx) {
+        return -1;
+    }
+    line->protocol = NKString_CopyFrom((const char *)buf->values + lIdx,
+                                       (uint64_t)(rIdx - lIdx));
+
+    return 0;
 }
 
 int32_t parseHeaders(ParserContext *ctx) {
@@ -191,8 +303,9 @@ int32_t parseHeaders(ParserContext *ctx) {
         return -1;
     }
 
-    // case: no headers at all
-    if (Range_IsInitial(ctx->headersRange)) {
+    // case: no headers at all, valid for HTTP/1.0 ->
+    // let it be sourted out later
+    if (Range_IsEmpty(ctx->headersRange)) {
         ctx->state = Complete;
         return 0;
     }
@@ -219,10 +332,7 @@ ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
     if (ctx == NULL) {
         return UnknownError;
     }
-    if (ctx->buffer == NULL) {
-        return UnknownError;
-    }
-    if (ctx->buffer->values == NULL) {
+    if (NKBuffer_IsValidAndEmpty(ctx->buffer)) {
         return UnknownError;
     }
 
@@ -255,6 +365,10 @@ ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
 
         case CompleteHeaders: {
             if (initRequest(ctx) || parseStartLine(ctx) || parseHeaders(ctx)) {
+                if (ctx->request) {
+                    Request_Free(ctx->request);
+                    ctx->request = NULL;
+                }
                 ctx->state = BadRequestError;
             }
             break;

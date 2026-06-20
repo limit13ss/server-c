@@ -22,7 +22,12 @@ static const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 /// ==================== ======= ====================
 
 typedef struct {
-    NKString *values;
+    NKString key;
+    NKString value;
+} KeyValuePair;
+
+typedef struct {
+    KeyValuePair *values;
     uint16_t count;
 } RequestParamArray;
 
@@ -30,12 +35,7 @@ RequestParamArray RequestParamArray_Empty(void);
 int8_t RequestParamArray_IsEmpty(RequestParamArray value);
 
 typedef struct {
-    NKString key;
-    NKString value;
-} RequestHeader;
-
-typedef struct {
-    RequestHeader *values;
+    KeyValuePair *values;
     uint16_t count;
 } RequestHeaderArray;
 
@@ -52,7 +52,7 @@ typedef enum {
     HEAD    = 6,
     OPTIONS = 7,
     TRACE   = 8,
-    EMPTY   = -1
+    UNKNOWN = -1
 } HttpMethod;
 
 typedef struct {
@@ -74,5 +74,6 @@ typedef struct {
 
 HttpRequest *Request_Init(void);
 void Request_Free(HttpRequest *req);
+HttpMethod MethodFromString(const char *str, uint8_t strLen);
 
 #endif // NAZARK_INCLUDE_H

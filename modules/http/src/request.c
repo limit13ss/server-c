@@ -2,6 +2,26 @@
 #include "common.h"
 
 #include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    const char *str;
+    uint8_t strLen;
+    HttpMethod value;
+} MethodMapping;
+
+const MethodMapping METHODS_MAP[] = {
+    { .str = "GET", .strLen = 3, .value = GET },
+    { .str = "POST", .strLen = 4, .value = POST },
+    { .str = "PUT", .strLen = 3, .value = PUT },
+    { .str = "PATCH", .strLen = 5, .value = PATCH },
+    { .str = "DELETE", .strLen = 6, .value = DELETE },
+    { .str = "CONNECT", .strLen = 7, .value = CONNECT },
+    { .str = "HEAD", .strLen = 4, .value = HEAD },
+    { .str = "OPTIONS", .strLen = 7, .value = OPTIONS },
+    { .str = "TRACE", .strLen = 5, .value = TRACE }
+};
+#define METHOD_COUNT 9
 
 void freeParamArray(RequestParamArray arr) {
     if (!arr.values) {
@@ -9,7 +29,11 @@ void freeParamArray(RequestParamArray arr) {
     }
 
     for (size_t i = 0; i < arr.count; ++i) {
-        NKString_Free(arr.values[i]);
+        KeyValuePair *pair = &arr.values[i];
+        NKString_Free(pair->key);
+        NKString_Free(pair->value);
+        pair->key   = NKString_Empty();
+        pair->value = NKString_Empty();
     }
 }
 
@@ -51,7 +75,7 @@ HttpRequest *Request_Init(void) {
     }
 
     request->startLine =
-        (RequestStartLine){ .method     = EMPTY,
+        (RequestStartLine){ .method     = UNKNOWN,
                             .targetPath = NKString_Empty(),
                             .params     = RequestParamArray_Empty(),
                             .protocol   = NKString_Empty() };
@@ -72,10 +96,26 @@ void Request_Free(HttpRequest *req) {
     req->startLine.targetPath = NKString_Empty();
     req->startLine.params     = RequestParamArray_Empty();
     req->startLine.protocol   = NKString_Empty();
-    req->startLine.method     = EMPTY;
+    req->startLine.method     = UNKNOWN;
 
     freeHeaderArray(req->headers);
     NKString_Free(req->body);
     req->headers = RequestHeaderArray_Empty();
     req->body    = NKString_Empty();
+}
+
+HttpMethod MethodFromString(const char *str, uint8_t strLen) {
+    if (strLen == 0) {
+        return UNKNOWN;
+    }
+
+    for (size_t i = 0; i < METHOD_COUNT; ++i) {
+        const MethodMapping mapping = METHODS_MAP[i];
+        if (mapping.strLen == strLen &&
+            strncmp(mapping.str, str, strLen) == 0) {
+            return mapping.value;
+        }
+    }
+
+    return UNKNOWN;
 }

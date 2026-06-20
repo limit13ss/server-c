@@ -20,8 +20,13 @@ typedef struct {
     uint32_t length;
 } NKBuffer;
 
+NKBuffer NKBuffer_Empty(void);
+int8_t NKBuffer_IsValidAndEmpty(NKBuffer buf);
+void NKBuffer_Free(NKBuffer buf);
+
 NKString NKString_Empty(void);
 int8_t NKString_IsEmpty(NKString value);
+NKString NKString_CopyFrom(const char *str, uint64_t len);
 
 void NKString_Free(NKString str);
 

@@ -14,6 +14,20 @@ int64_t indexOf(const uint8_t *arr, uint32_t arrLen, uint8_t targetCh) {
     return -1;
 }
 
+int64_t indexOfSkip(const uint8_t *arr, uint32_t arrLen, uint8_t targetCh,
+                    uint32_t skipCount) {
+    if (!arr || arrLen <= skipCount) {
+        return -1;
+    }
+
+    int64_t relIndex = indexOf(arr + skipCount, arrLen, targetCh);
+    if (relIndex < 0) {
+        return -1;
+    }
+
+    return skipCount + relIndex;
+}
+
 int64_t indexOfSeq(const uint8_t *arr, uint32_t arrLen,
                    const uint8_t *targetSeq, uint32_t targetLen) {
     if (!arr || !targetSeq || targetLen == 0 || targetLen > arrLen) {
@@ -36,19 +50,19 @@ int64_t indexOfSeq(const uint8_t *arr, uint32_t arrLen,
     return -1;
 }
 
-int64_t indexOfSeqOff(const uint8_t *arr, uint32_t arrLen,
-                      const uint8_t *targetSeq, uint32_t targetLen,
-                      uint32_t arrOffset) {
-    if (!arr || !targetSeq || targetLen == 0 || arrOffset >= arrLen ||
-        targetLen > arrLen - arrOffset) {
+int64_t indexOfSeqSkip(const uint8_t *arr, uint32_t arrLen,
+                       const uint8_t *targetSeq, uint32_t targetLen,
+                       uint32_t skipCount) {
+    if (!arr || !targetSeq || targetLen == 0 || skipCount >= arrLen ||
+        targetLen > arrLen - skipCount) {
         return -1;
     }
 
     int64_t relIndex =
-        indexOfSeq(arr + arrOffset, arrLen - arrOffset, targetSeq, targetLen);
+        indexOfSeq(arr + skipCount, arrLen - skipCount, targetSeq, targetLen);
     if (relIndex < 0) {
         return relIndex;
     }
 
-    return arrOffset + relIndex;
+    return skipCount + relIndex;
 }
