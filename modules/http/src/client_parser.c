@@ -253,46 +253,43 @@ int32_t parseStartLine(ParserContext *ctx) {
         return -1;
     }
 
-    NKBuffer *buf          = &ctx->buffer;
+    uint8_t *buf           = ctx->buffer.values + ctx->startLineRange.startPos;
+    char *bufStr           = (char *)buf;
+    uint32_t bufLen        = (uint32_t)(ctx->startLineRange.endPos + 1 -
+                                 ctx->startLineRange.startPos);
     RequestStartLine *line = &ctx->request->startLine;
 
     int64_t lIdx = 0, rIdx = 0;
-    rIdx = indexOf(buf->values, buf->length, SPACE);
+    rIdx = indexOf(buf, bufLen, SPACE);
     if (rIdx < lIdx || rIdx > UINT8_MAX) {
         return -1;
     }
 
-    line->method = MethodFromString((const char *)buf->values, (uint8_t)rIdx);
+    line->method = MethodFromString(bufStr, (uint8_t)rIdx);
     if (line->method == UNKNOWN) {
         return -1;
     }
 
     lIdx = rIdx + 1;
-    rIdx = indexOfSkip(buf->values, buf->length, SPACE, (uint32_t)lIdx);
+    rIdx = indexOfSkip(buf, bufLen, SPACE, (uint32_t)lIdx);
     if (rIdx <= lIdx || rIdx > UINT16_MAX) {
         return -1;
     }
 
-    int64_t paramsIdx =
-        indexOfSkip(buf->values, buf->length, '?', (uint32_t)lIdx);
+    int64_t paramsIdx = indexOfSkip(buf, bufLen, '?', (uint32_t)lIdx);
     if (paramsIdx == -1) {
-        line->targetPath = NKString_CopyFrom((const char *)buf->values + lIdx,
-                                             (uint64_t)(rIdx - lIdx));
+        line->targetPath =
+            NKString_CopyFrom(bufStr + lIdx, (uint64_t)(rIdx - lIdx));
     } else {
-        line->targetPath = NKString_CopyFrom((const char *)buf->values + lIdx,
-                                             (uint64_t)(paramsIdx - lIdx));
-        line->params     = parseParams(buf->values + paramsIdx + 1,
-                                       (uint64_t)(rIdx - paramsIdx - 1));
+        line->targetPath =
+            NKString_CopyFrom(bufStr + lIdx, (uint64_t)(paramsIdx - lIdx));
+        line->params =
+            parseParams(buf + paramsIdx + 1, (uint64_t)(rIdx - paramsIdx - 1));
     }
-    lIdx = rIdx + 1;
 
-    rIdx = indexOfSkip(buf->values, buf->length, HTTP_SEPARATOR[0],
-                       (uint32_t)lIdx);
-    if (rIdx <= lIdx) {
-        return -1;
-    }
-    line->protocol = NKString_CopyFrom((const char *)buf->values + lIdx,
-                                       (uint64_t)(rIdx - lIdx));
+    lIdx = rIdx + 1;
+    line->protocol =
+        NKString_CopyFrom(bufStr + lIdx, (uint64_t)(bufLen - lIdx));
 
     return 0;
 }
