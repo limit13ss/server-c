@@ -24,7 +24,7 @@ void NKBuffer_Free(NKBuffer buf) {
 NKString NKString_Empty(void) { return (NKString){ .data = NULL, .len = 0 }; }
 int8_t NKString_IsEmpty(NKString value) { return !value.data || !value.len; }
 
-NKString NKString_CopyFrom(const char *str, uint64_t len) {
+NKString NKString_CopyFrom(const void *str, uint64_t len) {
     if (!len) {
         return NKString_Empty();
     }

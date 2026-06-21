@@ -1,5 +1,4 @@
 #include "client_parser.h"
-#include "array_utils.h"
 #include "common.h"
 #include "linked_list.h"
 #include "request.h"
@@ -10,8 +9,8 @@
 
 // both are inclusive
 typedef struct {
-    int64_t startPos;
-    int64_t endPos;
+    uint64_t startPos;
+    uint64_t endPos;
 } Range;
 
 int8_t Range_IsEmpty(Range value) { return value.startPos >= value.endPos; }
@@ -48,8 +47,8 @@ ParserContext *ParserContext_Init(void) {
 
     ctx->state              = Empty;
     ctx->buffer             = initNKBuffer();
-    ctx->startLineRange     = (Range){ .startPos = -1, .endPos = -1 };
-    ctx->headersRange       = (Range){ .startPos = -1, .endPos = -1 };
+    ctx->startLineRange     = (Range){ .startPos = 0, .endPos = 0 };
+    ctx->headersRange       = (Range){ .startPos = 0, .endPos = 0 };
     ctx->bodyExpectedLength = 0;
     ctx->request            = NULL;
 
@@ -96,19 +95,15 @@ int32_t findStartLine(ParserContext *ctx) {
         return -1;
     }
 
-    if (ctx->startLineRange.startPos < 0) {
-        ctx->startLineRange.startPos = 0;
-    }
+    void *sepPtr =
+        memmem(cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
 
-    int64_t lineEndPos =
-        indexOfSeq(cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
-
-    if (lineEndPos == -1) {
+    if (!sepPtr) {
         return -1;
     }
 
-    ctx->startLineRange.endPos = lineEndPos - 1;
-    ctx->headersRange.startPos = lineEndPos + HTTP_SEPARATOR_LEN;
+    ctx->startLineRange.endPos = (uint64_t)sepPtr - (uint64_t)cb->values - 1;
+    ctx->headersRange.startPos = (uint64_t)sepPtr + HTTP_SEPARATOR_LEN;
 
     ctx->state = AwaitingHeaders;
 
@@ -121,35 +116,37 @@ int32_t findHeaders(ParserContext *ctx) {
     if (cb->length <= 0) {
         return -1;
     }
-    if (ctx->headersRange.startPos < 0) {
+    if (Range_IsEmpty(ctx->startLineRange) || !ctx->headersRange.startPos) {
         ctx->state = BadRequestError;
         return -1;
     }
 
-    int64_t headEndPos = indexOfSeqSkip(
-        cb->values, cb->length, DOUBLE_HTTP_SEPARATOR,
-        DOUBLE_HTTP_SEPARATOR_LEN, (uint32_t)ctx->headersRange.startPos);
+    void *sepPtr = memmem(cb->values + ctx->headersRange.startPos, cb->length,
+                          DOUBLE_HTTP_SEPARATOR, DOUBLE_HTTP_SEPARATOR_LEN);
 
-    if (headEndPos == -1) {
+    if (!sepPtr) {
         if (cb->length >= cb->capacity) {
             ctx->state = LongHeadersError;
             return -1;
         }
 
-        int64_t separatorIdx = indexOfSeqSkip(
-            cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN,
-            (uint32_t)ctx->headersRange.startPos);
+        sepPtr = memmem(cb->values + ctx->headersRange.startPos, cb->length,
+                        HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
 
-        // case: request without single header
-        if (separatorIdx == ctx->headersRange.startPos) {
-            ctx->headersRange.startPos = -1;
-            ctx->headersRange.endPos   = -1;
+        // case: request without headers at all
+        // "GET /path HTTP/1.0\r\n\r\n"
+        //                         ^
+        //                         |
+        //                  headersRange.startPos
+        if (sepPtr == cb->values + ctx->headersRange.startPos) {
+            ctx->headersRange.startPos = 0;
+            ctx->headersRange.endPos   = 0;
             ctx->state                 = CompleteHeaders;
             return 0;
         }
     }
 
-    ctx->headersRange.endPos = headEndPos - 1;
+    ctx->headersRange.endPos = (uint64_t)sepPtr - (uint64_t)cb->values - 1;
     ctx->state               = CompleteHeaders;
 
     return 0;
@@ -253,43 +250,53 @@ int32_t parseStartLine(ParserContext *ctx) {
         return -1;
     }
 
-    uint8_t *buf           = ctx->buffer.values + ctx->startLineRange.startPos;
-    char *bufStr           = (char *)buf;
-    uint32_t bufLen        = (uint32_t)(ctx->startLineRange.endPos + 1 -
-                                 ctx->startLineRange.startPos);
     RequestStartLine *line = &ctx->request->startLine;
+    void *winPtr           = ctx->buffer.values + ctx->startLineRange.startPos;
+    uint64_t winLen        = 0;
+    uint64_t slLen         = (uint64_t)(ctx->startLineRange.endPos + 1 -
+                                ctx->startLineRange.startPos);
+    void *spPtr            = NULL;
 
-    int64_t lIdx = 0, rIdx = 0;
-    rIdx = indexOf(buf, bufLen, SPACE);
-    if (rIdx < lIdx || rIdx > UINT8_MAX) {
+    spPtr  = memchr(winPtr, SPACE, slLen);
+    winLen = (uint64_t)spPtr - (uint64_t)winPtr;
+    if (!spPtr || winLen > UINT16_MAX) {
         return -1;
     }
+    // processed winLen bytes + 1 space byte
+    slLen -= winLen + 1;
 
-    line->method = MethodFromString(bufStr, (uint8_t)rIdx);
+    line->method = MethodFromString(winPtr, (uint16_t)winLen);
     if (line->method == UNKNOWN) {
         return -1;
     }
+    // points to start of target
+    winPtr = (void *)((uint64_t)spPtr + 1);
 
-    lIdx = rIdx + 1;
-    rIdx = indexOfSkip(buf, bufLen, SPACE, (uint32_t)lIdx);
-    if (rIdx <= lIdx || rIdx > UINT16_MAX) {
+    spPtr  = memchr(winPtr, SPACE, slLen);
+    winLen = (uint64_t)spPtr - (uint64_t)winPtr;
+    if (!spPtr || winLen > UINT16_MAX) {
         return -1;
     }
 
-    int64_t paramsIdx = indexOfSkip(buf, bufLen, '?', (uint32_t)lIdx);
-    if (paramsIdx == -1) {
-        line->targetPath =
-            NKString_CopyFrom(bufStr + lIdx, (uint64_t)(rIdx - lIdx));
+    void *qPtr = memchr(winPtr, '?', winLen);
+    if (qPtr) {
+        winLen           = (uint64_t)qPtr - (uint64_t)winPtr;
+        line->targetPath = NKString_CopyFrom(winPtr, winLen);
+        // processed target len + 1 'question mark' byte
+        slLen -= winLen + 1;
+
+        // points to start of parameters
+        winPtr       = (void *)((uint64_t)qPtr + 1);
+        winLen       = (uint64_t)spPtr - (uint64_t)winPtr;
+        line->params = parseParams(winPtr, winLen);
+        slLen -= winLen + 1;
     } else {
-        line->targetPath =
-            NKString_CopyFrom(bufStr + lIdx, (uint64_t)(paramsIdx - lIdx));
-        line->params =
-            parseParams(buf + paramsIdx + 1, (uint64_t)(rIdx - paramsIdx - 1));
+        line->targetPath = NKString_CopyFrom(winPtr, winLen);
+        slLen -= winLen + 1;
     }
 
-    lIdx = rIdx + 1;
-    line->protocol =
-        NKString_CopyFrom(bufStr + lIdx, (uint64_t)(bufLen - lIdx));
+    winPtr         = (void *)((uint64_t)spPtr + 1);
+    line->protocol = NKString_CopyFrom(winPtr, slLen);
 
     return 0;
 }

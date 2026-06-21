@@ -74,6 +74,6 @@ typedef struct {
 
 HttpRequest *Request_Init(void);
 void Request_Free(HttpRequest *req);
-HttpMethod MethodFromString(const char *str, uint8_t strLen);
+HttpMethod MethodFromString(const char *str, uint16_t strLen);
 
 #endif // NAZARK_INCLUDE_H

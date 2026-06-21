@@ -104,7 +104,7 @@ void Request_Free(HttpRequest *req) {
     req->body    = NKString_Empty();
 }
 
-HttpMethod MethodFromString(const char *str, uint8_t strLen) {
+HttpMethod MethodFromString(const char *str, uint16_t strLen) {
     if (strLen == 0) {
         return UNKNOWN;
     }

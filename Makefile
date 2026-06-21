@@ -11,7 +11,8 @@ UTILITY_TESTS = modules/utility/tests
 APP_INCLUDE = modules/app/include
 APP_SRC = modules/app/src
 
-CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion -D_POSIX_C_SOURCE=200809L
+#- D_POSIX_C_SOURCE = 200809L
+CFLAGS = -Wall -Wextra -Werror -pedantic -std=c11 -Wconversion -D_GNU_SOURCE
 ICFLAGS = $(CFLAGS) -I$(HTTP_INCLUDE) -I$(UTILITY_INCLUDE) -I$(APP_INCLUDE)
 DEBUG_CFLAGS = -g
 
@@ -51,10 +52,6 @@ test-queue:
 test-thread-pool:
 	$(MK_OUT_TEST)
 	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_thread_pool.c $(UTILITY_SRC)/thread_pool.c $(UTILITY_SRC)/queue.c -o ./$(OUT_TEST)/$@
-
-test-array-util:
-	$(MK_OUT_TEST)
-	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_array_utils.c $(UTILITY_SRC)/array_utils.c -o ./$(OUT_TEST)/$@
 
 %.o.test: %.c
 	$(CC) $(ICFLAGS) $(DEBUG_CFLAGS) -c $< -o $@

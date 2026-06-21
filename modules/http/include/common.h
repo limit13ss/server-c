@@ -26,7 +26,7 @@ void NKBuffer_Free(NKBuffer buf);
 
 NKString NKString_Empty(void);
 int8_t NKString_IsEmpty(NKString value);
-NKString NKString_CopyFrom(const char *str, uint64_t len);
+NKString NKString_CopyFrom(const void *str, uint64_t len);
 
 void NKString_Free(NKString str);
 
