@@ -19,7 +19,7 @@ typedef enum {
     LongHeadersError  = 7,
     BadRequestError   = 8,
     UnknownError      = -1
-} ParsingState;
+} RequestParsingState;
 
 typedef struct ParserContext ParserContext;
 
@@ -27,7 +27,7 @@ ParserContext *ParserContext_Init(void);
 void ParserContext_Free(ParserContext *ctx);
 NKBuffer *ParserContext_GetBuffer(ParserContext *ctx);
 
-ParsingState Parser_TryParseHeaders(ParserContext *ctx);
+RequestParsingState Parser_TryParseRequest(ParserContext *ctx);
 HttpRequest *Parser_TryGetRequest(ParserContext *ctx);
 
 #endif // NAZARK_CLIENT_PARSER_H

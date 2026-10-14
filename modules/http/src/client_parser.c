@@ -17,7 +17,7 @@ int8_t Range_IsEmpty(Range value) { return value.startPos >= value.endPos; }
 
 struct ParserContext {
     NKBuffer buffer;
-    ParsingState state;
+    RequestParsingState state;
     uint32_t bodyExpectedLength;
     Range startLineRange;
     Range headersRange;
@@ -141,7 +141,14 @@ int32_t findHeaders(ParserContext *ctx) {
         if (sepPtr == cb->values + ctx->headersRange.startPos) {
             ctx->headersRange.startPos = 0;
             ctx->headersRange.endPos   = 0;
-            ctx->state                 = CompleteHeaders;
+            ctx->state                 = Complete;
+            return 0;
+
+        // case: didn't find "\r\n\r\n" but found "\r\n"
+        // and "cb->length < cb->capacity"
+        // continue reading from client
+        } else {
+            ctx->state = AwaitingHeaders;
             return 0;
         }
     }
@@ -307,13 +314,6 @@ int32_t parseHeaders(ParserContext *ctx) {
         return -1;
     }
 
-    // case: no headers at all, valid for HTTP/1.0 ->
-    // let it be sourted out later
-    if (Range_IsEmpty(ctx->headersRange)) {
-        ctx->state = Complete;
-        return 0;
-    }
-
     // TODO: implement
 
     return -1;
@@ -332,7 +332,7 @@ int32_t initRequest(ParserContext *ctx) {
     return 0;
 }
 
-ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
+RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
     if (ctx == NULL) {
         return UnknownError;
     }
@@ -340,19 +340,30 @@ ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
         return UnknownError;
     }
 
-    if (ctx->state == AwaitingBody || ctx->state == Complete ||
-        ctx->state == GenericError || ctx->state == LongHeadersError) {
+    switch (ctx->state) {
+    case Empty: {
+        ctx->state = AwaitingStartLine;
+    }
+    case AwaitingStartLine:
+    case AwaitingHeaders:
+    case CompleteHeaders: 
+    case AwaitingBody: {
+        // do nothing -> continue
+        break;
+    }
+
+    case Complete:
+    case GenericError:
+    case LongHeadersError:
+    case BadRequestError:
+    case UnknownError:
+    default: {
         return ctx->state;
+    }
     }
 
     while (1) {
         switch (ctx->state) {
-
-        case Empty: {
-            ctx->state = AwaitingStartLine;
-            break;
-        }
-
         case AwaitingStartLine: {
             if (findStartLine(ctx)) {
                 goto returnLabel;
@@ -377,7 +388,10 @@ ParsingState Parser_TryParseHeaders(ParserContext *ctx) {
             }
             break;
         }
-        case AwaitingBody:
+        case AwaitingBody: {
+            break;
+        }
+
         case Complete:
         case BadRequestError:
         case GenericError:

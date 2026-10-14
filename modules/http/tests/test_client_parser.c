@@ -10,7 +10,7 @@ int main(void) {
     strncpy((char *)buffer->values, exampleRequest, len);
     buffer->length = (uint32_t)len;
 
-    Parser_TryParseHeaders(ctx);
+    Parser_TryParseRequest(ctx);
 
     return 0;
 }

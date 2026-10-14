@@ -47,7 +47,7 @@ void freeContext(const int32_t fd) {
     g_parserContexts[fd] = NULL;
 }
 
-int32_t readHeaders(const int32_t fd) {
+int32_t readFromClient(const int32_t fd) {
     ParserContext *ctx = getContext(fd);
     if (ctx == NULL) {
         return -1;
@@ -110,7 +110,7 @@ void *clientReaderRoutine(void *arg) {
                 return NULL;
             }
 
-            int32_t read = readHeaders(activeFd);
+            int32_t read = readFromClient(activeFd);
             if (read < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
                     continue;
@@ -126,10 +126,10 @@ void *clientReaderRoutine(void *arg) {
                 goto closeClient;
             }
 
-            ParsingState currentState =
-                Parser_TryParseHeaders(getContext(activeFd));
+            RequestParsingState requestParsingState =
+                Parser_TryParseRequest(getContext(activeFd));
 
-            if (currentState) {
+            if (requestParsingState) {
                 // TODO: act based on ctx->state
             }
 

@@ -91,7 +91,7 @@ int32_t mainLoopAction(int32_t mainSocketFd) {
         }
 
         while (true) {
-            // draining all pending connection in one wake
+            // draining all pending connections in one wake
             struct sockaddr_in clientAddr;
             socklen_t clientLen = sizeof(clientAddr);
 
