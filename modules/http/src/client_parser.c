@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 // both are inclusive
 typedef struct {
@@ -167,7 +168,7 @@ void freeParamListElement(void *arg) {
     NKStringPair_Free(*pair);
 }
 
-bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams, uint16_t *outParamsCount) {
+bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount) {
     if (!data || !dataLen) {
         *outParams = NULL;
         *outParamsCount = 0;
@@ -227,11 +228,13 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams,
         token = strtok(NULL, "&");
     }
 
-    if (!LinkedList_Length(paramsList, outParamsCount) ||
-        *outParamsCount > UINT16_MAX) {
+    uint64_t paramsCount = 0;
+    if (!LinkedList_Length(paramsList, &paramsCount) ||
+        paramsCount > UINT16_MAX) {
         goto freeListReturnFalse;
     }
 
+    *outParamsCount = (uint16_t)paramsCount;
     *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
     if (!(*outParams)) {
         goto freeListReturnFalse;
@@ -240,8 +243,10 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams,
     uint16_t i = 0;
     void *item;
     while (LinkedList_PopStart(paramsList, &item)) {
-        Pair *pair = item;
-        (*outParams)[i++] = *item;
+        NKStringPair *pair = item;
+        (*outParams)[i][0] = (*pair)[0];
+        (*outParams)[i][1] = (*pair)[1];
+        ++i;
         free(pair);
     }
 

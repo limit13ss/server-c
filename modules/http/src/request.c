@@ -27,20 +27,9 @@ const MethodMapping METHODS_MAP[] = {
 /// ==================== FUNCTIONS ====================
 /// ==================== ========= ====================
 
-HttpMethod MethodFromString(const char *str, uint16_t strLen) {
-    if (strLen == 0) {
-        return UNKNOWN;
-    }
-
-    for (size_t i = 0; i < METHOD_COUNT; ++i) {
-        const MethodMapping mapping = METHODS_MAP[i];
-        if (mapping.strLen == strLen &&
-            strncmp(mapping.str, str, strLen) == 0) {
-            return mapping.value;
-        }
-    }
-
-    return UNKNOWN;
+void NKStringPair_Free(NKStringPair pair) {
+    NKString_Free(pair[0]);
+    NKString_Free(pair[1]);
 }
 
 RequestStartLine RequestStartLine_Init(void) {
@@ -49,7 +38,7 @@ RequestStartLine RequestStartLine_Init(void) {
         .targetPath = NKString_Empty(),
         .params = NULL,
         .paramsCount = 0,
-        .protocol = NKString_Empty();
+        .protocol = NKString_Empty(),
     };
 }
 
@@ -87,7 +76,7 @@ void HttpRequest_Free(HttpRequest *req) {
         return;
     }
 
-    RequestStartLine_Free(req->startLine);
+    RequestStartLine_Free(&(req->startLine));
     
     if (req->headers) {
         for (uint16_t i = 0; i < req->headersCount; ++i) {
@@ -99,4 +88,20 @@ void HttpRequest_Free(HttpRequest *req) {
 
     NKBuffer_Free(req->body);
     req->body = NKBuffer_Empty();
+}
+
+HttpMethod MethodFromString(const char *str, uint16_t strLen) {
+    if (strLen == 0) {
+        return UNKNOWN;
+    }
+
+    for (size_t i = 0; i < METHOD_COUNT; ++i) {
+        const MethodMapping mapping = METHODS_MAP[i];
+        if (mapping.strLen == strLen &&
+            strncmp(mapping.str, str, strLen) == 0) {
+            return mapping.value;
+        }
+    }
+
+    return UNKNOWN;
 }

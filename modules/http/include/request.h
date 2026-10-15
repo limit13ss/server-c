@@ -23,11 +23,6 @@ static const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 
 typedef NKString NKStringPair[2];
 
-void NKStringPair_Free(NKStringPair pair) {
-    NKString_Free(pair[0]);
-    NKString_Free(pair[1]);
-}
-
 typedef enum {
     GET     = 0,
     POST    = 1,
@@ -59,6 +54,8 @@ typedef struct {
 /// ==================== ========= ====================
 /// ==================== FUNCTIONS ====================
 /// ==================== ========= ====================
+
+void NKStringPair_Free(NKStringPair pair);
 
 HttpRequest HttpRequest_Init(void);
 void HttpRequest_Free(HttpRequest *req);
