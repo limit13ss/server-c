@@ -60,7 +60,12 @@ typedef struct {
 /// ==================== FUNCTIONS ====================
 /// ==================== ========= ====================
 
+HttpRequest HttpRequest_Init(void);
+void HttpRequest_Free(HttpRequest *req);
+
+RequestStartLine RequestStartLine_Init(void);
 void RequestStartLine_Free(RequestStartLine *rsl);
+
 HttpMethod MethodFromString(const char *str, uint16_t strLen);
 
 #endif // NAZARK_INCLUDE_H

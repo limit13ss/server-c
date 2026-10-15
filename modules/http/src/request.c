@@ -43,11 +43,60 @@ HttpMethod MethodFromString(const char *str, uint16_t strLen) {
     return UNKNOWN;
 }
 
+RequestStartLine RequestStartLine_Init(void) {
+    return (RequestStartLine) {
+        .method = UNKNOWN,
+        .targetPath = NKString_Empty(),
+        .params = NULL,
+        .paramsCount = 0,
+        .protocol = NKString_Empty();
+    };
+}
+
 void RequestStartLine_Free(RequestStartLine *rsl) {
     if (!rsl) {
         return;
     }
 
+    rsl->method = UNKNOWN;
     NKString_Free(rsl->targetPath);
-    NKStringPair_Free(rsl->params);
+
+    if (rsl->params) {
+        for (uint16_t i = 0; i < rsl->paramsCount; ++i) {
+            NKStringPair_Free(rsl->params[i]);
+        }
+        free(rsl->params);
+        rsl->params = NULL;
+    }
+    rsl->paramsCount = 0;
+
+    NKString_Free(rsl->protocol);
+}
+
+HttpRequest HttpRequest_Init(void) {
+    return (HttpRequest) {
+        .startLine = RequestStartLine_Init(),
+        .headers = NULL,
+        .headersCount = 0,
+        .body = NKBuffer_Empty(),
+    };
+}
+
+void HttpRequest_Free(HttpRequest *req) {
+    if (!req) {
+        return;
+    }
+
+    RequestStartLine_Free(req->startLine);
+    
+    if (req->headers) {
+        for (uint16_t i = 0; i < req->headersCount; ++i) {
+            NKStringPair_Free(req->headers[i]);
+        }
+        req->headers = NULL;
+    }
+    req->headersCount = 0;
+
+    NKBuffer_Free(req->body);
+    req->body = NKBuffer_Empty();
 }

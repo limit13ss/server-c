@@ -176,7 +176,7 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams,
 
     LinkedList_t *paramsList = LinkedList_Create(freeParamListElement);
     if (!paramsList) {
-        return RequestParamArray_Empty();
+        return false;
     }
 
     char *query = (char *)data;
@@ -238,7 +238,6 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams,
     }
 
     uint16_t i = 0;
-
     void *item;
     while (LinkedList_PopStart(paramsList, &item)) {
         Pair *pair = item;
@@ -309,11 +308,10 @@ int32_t parseStartLine(ParserContext *ctx) {
         winPtr = (void *)((uint64_t)qPtr + 1);
         winLen = (uint64_t)spPtr - (uint64_t)winPtr;
 
-        NKStringPair *params = NULL;
-        uint16_t paramsCount = 0;
-        if (!parseParams(winPtr, winLen, &params, &paramsCount)) {
-
+        if (!parseParams(winPtr, winLen, &(line->params), &(line->paramsCount))) {
+            return -1;
         }
+
         slLen -= winLen + 1;
     } else {
         line->targetPath = NKString_CopyFrom(winPtr, winLen);
@@ -335,19 +333,6 @@ int32_t parseHeaders(ParserContext *ctx) {
     // TODO: implement
 
     return -1;
-}
-
-int32_t initRequest(ParserContext *ctx) {
-    if (ctx->request) {
-        return 0;
-    }
-
-    ctx->request = calloc(1, sizeof ctx->request);
-    if (!ctx->request) {
-        return -1;
-    }
-
-    return 0;
 }
 
 RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
@@ -374,6 +359,7 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
     case GenericError:
     case LongHeadersError:
     case BadRequestError:
+    case InternalError:
     case UnknownError:
     default: {
         return ctx->state;
@@ -397,11 +383,18 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
         }
 
         case CompleteHeaders: {
-            if (initRequest(ctx) || parseStartLine(ctx) || parseHeaders(ctx)) {
-                if (ctx->request) {
-                    Request_Free(ctx->request);
-                    ctx->request = NULL;
-                }
+            ctx->request = calloc(1, sizeof *(ctx->request));
+            if (!ctx->request) {
+                ctx->state = InternalError;
+                break;
+            }
+
+            *ctx->request = HttpRequest_Init();
+
+            if (parseStartLine(ctx) != 0 || parseHeaders(ctx) != 0) {
+                HttpRequest_Free(ctx->request);
+                ctx->request = NULL;
+
                 ctx->state = BadRequestError;
             }
             break;
@@ -414,6 +407,7 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
         case BadRequestError:
         case GenericError:
         case LongHeadersError:
+        case InternalError:
         case UnknownError:
         default: {
             goto returnLabel;

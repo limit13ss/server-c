@@ -18,6 +18,7 @@ typedef enum {
     GenericError      = 6,
     LongHeadersError  = 7,
     BadRequestError   = 8,
+    InternalError     = 9,
     UnknownError      = -1
 } RequestParsingState;
 
