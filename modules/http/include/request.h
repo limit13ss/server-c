@@ -21,26 +21,12 @@ static const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 /// ==================== STRUCTS ====================
 /// ==================== ======= ====================
 
-typedef struct {
-    NKString key;
-    NKString value;
-} KeyValuePair;
+typedef NKString NKStringPair[2];
 
-typedef struct {
-    KeyValuePair *values;
-    uint16_t count;
-} RequestParamArray;
-
-RequestParamArray RequestParamArray_Empty(void);
-int8_t RequestParamArray_IsEmpty(RequestParamArray value);
-
-typedef struct {
-    KeyValuePair *values;
-    uint16_t count;
-} RequestHeaderArray;
-
-RequestHeaderArray RequestHeaderArray_Empty(void);
-int8_t RequestHeaderArray_IsEmpty(RequestHeaderArray value);
+void NKStringPair_Free(NKStringPair pair) {
+    NKString_Free(pair[0]);
+    NKString_Free(pair[1]);
+}
 
 typedef enum {
     GET     = 0,
@@ -58,22 +44,23 @@ typedef enum {
 typedef struct {
     HttpMethod method;
     NKString targetPath;
-    RequestParamArray params;
+    NKStringPair *params;
+    uint16_t paramsCount;
     NKString protocol;
 } RequestStartLine;
 
 typedef struct {
     RequestStartLine startLine;
-    RequestHeaderArray headers;
-    NKString body;
+    NKStringPair *headers;
+    uint16_t headersCount;
+    NKBuffer body;
 } HttpRequest;
 
 /// ==================== ========= ====================
 /// ==================== FUNCTIONS ====================
 /// ==================== ========= ====================
 
-HttpRequest *Request_Init(void);
-void Request_Free(HttpRequest *req);
+void RequestStartLine_Free(RequestStartLine *rsl);
 HttpMethod MethodFromString(const char *str, uint16_t strLen);
 
 #endif // NAZARK_INCLUDE_H

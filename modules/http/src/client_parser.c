@@ -1,7 +1,6 @@
 #include "client_parser.h"
 #include "common.h"
 #include "linked_list.h"
-#include "request.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -159,26 +158,26 @@ int32_t findHeaders(ParserContext *ctx) {
     return 0;
 }
 
-void freeKeyValuePair(void *arg) {
-    if (!arg) {
+void freeParamListElement(void *arg) {
+    if (arg == NULL) {
         return;
     }
-    KeyValuePair *pair = (KeyValuePair *)arg;
-    NKString_Free(pair->key);
-    NKString_Free(pair->value);
+
+    NKStringPair *pair = (NKStringPair *)arg;
+    NKStringPair_Free(*pair);
 }
 
-RequestParamArray parseParams(const uint8_t *data, uint64_t dataLen) {
+bool parseParams(const uint8_t *data, uint64_t dataLen, NKStingPair** outParams, uint16_t *outParamsCount) {
     if (!data || !dataLen) {
-        return RequestParamArray_Empty();
+        *outParams = NULL;
+        *outParamsCount = 0;
+        return true;
     }
 
-    LinkedList_t *paramsList = LinkedList_Create(freeKeyValuePair);
+    LinkedList_t *paramsList = LinkedList_Create(freeParamListElement);
     if (!paramsList) {
         return RequestParamArray_Empty();
     }
-
-    KeyValuePair *pair = NULL;
 
     char *query = (char *)data;
     char *token = strtok(query, "&");
@@ -208,44 +207,58 @@ RequestParamArray parseParams(const uint8_t *data, uint64_t dataLen) {
             key = NKString_CopyFrom(token, tokenLen);
         }
 
-        pair = calloc(1, sizeof(KeyValuePair));
+        NKStringPair* pair = calloc(1, sizeof *pair);
         if (!pair) {
             NKString_Free(key);
             NKString_Free(value);
-            goto freeListReturnEmpty;
+            goto freeListReturnFalse;
         }
 
-        pair->key   = key;
-        pair->value = value;
+        (*pair)[0] = key;
+        (*pair)[1] = value;
+
         if (!LinkedList_AddEnd(paramsList, pair)) {
             NKString_Free(key);
             NKString_Free(value);
-            goto freeListReturnEmpty;
+            free(pair);
+            goto freeListReturnFalse;
         }
+
+        token = strtok(NULL, "&");
     }
 
-    uint64_t paramsCount = 0;
-    if (!LinkedList_Length(paramsList, &paramsCount) ||
-        paramsCount > UINT16_MAX) {
-        goto freeListReturnEmpty;
-    }
-    KeyValuePair *arr = calloc(paramsCount, sizeof(KeyValuePair));
-    if (!arr) {
-        goto freeListReturnEmpty;
+    if (!LinkedList_Length(paramsList, outParamsCount) ||
+        *outParamsCount > UINT16_MAX) {
+        goto freeListReturnFalse;
     }
 
-    uint16_t i            = 0;
-    KeyValuePair *outPair = NULL;
-    while (LinkedList_PopStart(paramsList, (void **)&outPair)) {
-        arr[i] = *outPair;
-        ++i;
+    *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
+    if (!(*outParams)) {
+        goto freeListReturnFalse;
     }
 
-    return (RequestParamArray){ .values = arr, .count = (uint16_t)paramsCount };
+    uint16_t i = 0;
 
-freeListReturnEmpty:
+    void *item;
+    while (LinkedList_PopStart(paramsList, &item)) {
+        Pair *pair = item;
+        (*outParams)[i++] = *item;
+        free(pair);
+    }
+
     LinkedList_Free(paramsList);
-    return RequestParamArray_Empty();
+    return true;
+
+freeListReturnFalse:
+    LinkedList_Free(paramsList);
+    
+    if (*outParams) {
+        free(*outParams);
+        *outParams = NULL;
+    }
+    *outParamsCount = 0;
+
+    return false;
 }
 
 int32_t parseStartLine(ParserContext *ctx) {
@@ -293,9 +306,14 @@ int32_t parseStartLine(ParserContext *ctx) {
         slLen -= winLen + 1;
 
         // points to start of parameters
-        winPtr       = (void *)((uint64_t)qPtr + 1);
-        winLen       = (uint64_t)spPtr - (uint64_t)winPtr;
-        line->params = parseParams(winPtr, winLen);
+        winPtr = (void *)((uint64_t)qPtr + 1);
+        winLen = (uint64_t)spPtr - (uint64_t)winPtr;
+
+        NKStringPair *params = NULL;
+        uint16_t paramsCount = 0;
+        if (!parseParams(winPtr, winLen, &params, &paramsCount)) {
+
+        }
         slLen -= winLen + 1;
     } else {
         line->targetPath = NKString_CopyFrom(winPtr, winLen);
@@ -324,7 +342,7 @@ int32_t initRequest(ParserContext *ctx) {
         return 0;
     }
 
-    ctx->request = Request_Init();
+    ctx->request = calloc(1, sizeof ctx->request);
     if (!ctx->request) {
         return -1;
     }
