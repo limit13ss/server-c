@@ -53,6 +53,10 @@ test-thread-pool:
 	$(MK_OUT_TEST)
 	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(UTILITY_INCLUDE) -I$(UTILITY_TESTS) $(UTILITY_TESTS)/test_thread_pool.c $(UTILITY_SRC)/thread_pool.c $(UTILITY_SRC)/queue.c -o ./$(OUT_TEST)/$@
 
+test-request:
+	$(MK_OUT_TEST)
+	$(CC) $(CFLAGS) $(DEBUG_CFLAGS) -I$(HTTP_INCLUDE) -I$(HTTP_TESTS) $(HTTP_TESTS)/test_request.c $(HTTP_SRC)/request.c $(HTTP_SRC)/common.c -o ./$(OUT_TEST)/$@
+
 %.o.test: %.c
 	$(CC) $(ICFLAGS) $(DEBUG_CFLAGS) -c $< -o $@
 

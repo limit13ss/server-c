@@ -48,7 +48,9 @@ void RequestStartLine_Free(RequestStartLine *rsl) {
     }
 
     rsl->method = UNKNOWN;
+    
     NKString_Free(rsl->targetPath);
+    rsl->targetPath = NKString_Empty();
 
     if (rsl->params) {
         for (uint16_t i = 0; i < rsl->paramsCount; ++i) {
@@ -60,6 +62,7 @@ void RequestStartLine_Free(RequestStartLine *rsl) {
     rsl->paramsCount = 0;
 
     NKString_Free(rsl->protocol);
+    rsl->protocol = NKString_Empty();
 }
 
 HttpRequest HttpRequest_Init(void) {

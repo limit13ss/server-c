@@ -4,5 +4,7 @@ test/*
 compile_flags.txt
 
 *.o
+*.o.test
 
 sandbox*
+modules/utility/*/logger.*
