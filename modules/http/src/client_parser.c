@@ -103,7 +103,7 @@ int32_t findStartLine(ParserContext *ctx) {
     }
 
     ctx->startLineRange.endPos = (uint64_t)sepPtr - (uint64_t)cb->values - 1;
-    ctx->headersRange.startPos = (uint64_t)sepPtr + HTTP_SEPARATOR_LEN;
+    ctx->headersRange.startPos = ctx->startLineRange.endPos + HTTP_SEPARATOR_LEN + 1;
 
     ctx->state = AwaitingHeaders;
 
