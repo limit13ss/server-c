@@ -69,7 +69,7 @@ NKBuffer *ParserContext_GetBuffer(ParserContext *ctx) {
         return NULL;
     }
 
-    return &ctx->buffer;
+    return &(ctx->buffer);
 }
 
 HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
@@ -400,6 +400,7 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
             break;
         }
         case AwaitingBody: {
+            // TODO: implement
             break;
         }
 
