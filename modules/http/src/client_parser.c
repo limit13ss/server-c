@@ -88,7 +88,7 @@ HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
 /// ==================== REQUEST PARSING ====================
 /// ==================== =============== ====================
 
-bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount);
+bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCount);
 void freeParamListElement(void *arg);
 
 int32_t findStartLine(ParserContext *ctx) {
@@ -225,7 +225,10 @@ int32_t parseStartLine(ParserContext *ctx) {
         winPtr = (void *)((uint64_t)qPtr + 1);
         winLen = (uint64_t)spPtr - (uint64_t)winPtr;
 
-        if (!parseParams(winPtr, winLen, &(line->params), &(line->paramsCount))) {
+        if (!parseParams(NKString_CopyFrom(winPtr, winLen),
+            &(line->params),
+            &(line->paramsCount))
+        ) {
             return -1;
         }
 
@@ -341,8 +344,8 @@ returnLabel:
 /// ==================== HELPERS ====================
 /// ==================== ======= ====================
 
-bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount) {
-    if (!data || !dataLen) {
+bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCount) {
+    if (NKString_IsEmpty(str)) {
         *outParams = NULL;
         *outParamsCount = 0;
         return true;
@@ -353,61 +356,53 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams
         return false;
     }
 
-    char *query = (char *)data;
-    char *token = strtok(query, "&");
-    while (token) {
-        NKString key   = NKString_Empty();
-        NKString value = NKString_Empty();
+    uint16_t left = 0;
+    uint16_t right = 0;
+    uint16_t tokenLength = 0;
+    char *token = NULL;
 
-        uint64_t tokenOff   = (uint64_t)token;
-        uint64_t tokenLen   = 0;
-        uint64_t eqOff      = (uint64_t)strchr(token, '=');
-        uint64_t nextAndOff = (uint64_t)strchr(token, '&');
-
-        if (nextAndOff >= tokenOff) {
-            tokenLen = nextAndOff - tokenOff;
-        } else {
-            tokenLen = dataLen - tokenOff;
+    do {
+        while (right < str.length && str.data[right] != '&') {
+            ++right;
         }
+        token = (char *)(str.data + left);
+        tokenLength = right - left;
 
-        if (eqOff > tokenOff) {
-            key = NKString_CopyFrom(token, eqOff - tokenOff);
-            if (eqOff < tokenLen) {
-                value = NKString_CopyFrom(token + eqOff + 1, tokenLen - eqOff);
-            } else {
-                value = NKString_Empty();
-            }
-        } else {
-            key = NKString_CopyFrom(token, tokenLen);
+        if (tokenLength == 0) {
+            break;
         }
 
         NKStringPair* pair = calloc(1, sizeof *pair);
         if (!pair) {
-            NKString_Free(key);
-            NKString_Free(value);
             goto freeListReturnFalse;
         }
 
-        (*pair)[0] = key;
-        (*pair)[1] = value;
+        pair->key = NKString_Empty();
+        pair->value = NKString_Empty();
 
-        if (!LinkedList_AddEnd(paramsList, pair)) {
-            NKString_Free(key);
-            NKString_Free(value);
+        char *ptr = memchr(token, '=', tokenLength);
+        if (ptr) {
+            uint16_t eqOffset = (uint16_t)(ptr - token);
+            if (eqOffset == 0) {
+                continue;
+            }
+
+            pair->key = NKString_CopyFrom(token, eqOffset);
+            if (eqOffset < tokenLength - 1) {
+                pair->value = NKString_CopyFrom(token + eqOffset + 1, (uint64_t)(tokenLength - 1 - eqOffset));
+            }
+        }
+
+        if (LinkedList_AddEnd(paramsList, pair)) {
             free(pair);
             goto freeListReturnFalse;
         }
 
-        token = strtok(NULL, "&");
-    }
+        ++(*outParamsCount);
 
-    uint64_t paramsCount = 0;
-    if (!LinkedList_Length(paramsList, &paramsCount) ||
-        paramsCount > UINT16_MAX) {
-        goto freeListReturnFalse;
-    }
+        left = right;
+    } while (left < str.length);
 
-    *outParamsCount = (uint16_t)paramsCount;
     *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
     if (!(*outParams)) {
         goto freeListReturnFalse;
@@ -415,12 +410,10 @@ bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams
 
     uint16_t i = 0;
     void *item;
-    while (LinkedList_PopStart(paramsList, &item)) {
-        NKStringPair *pair = item;
-        (*outParams)[i][0] = (*pair)[0];
-        (*outParams)[i][1] = (*pair)[1];
-        ++i;
-        free(pair);
+    while (LinkedList_PopStart(paramsList, &item) == 0) {
+        (*outParams)[i++] = *((NKStringPair *)item);
+
+        free(item);
     }
 
     LinkedList_Free(paramsList);

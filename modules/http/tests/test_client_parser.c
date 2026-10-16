@@ -102,7 +102,7 @@ static void freeContext(ParserContext *ctx) {
 
 static bool stringEquals(NKString str, const char *expected) {
     size_t len = strlen(expected);
-    if (str.len != len) {
+    if (str.length != len) {
         return false;
     }
     return len == 0 || memcmp(str.data, expected, len) == 0;
@@ -110,7 +110,7 @@ static bool stringEquals(NKString str, const char *expected) {
 
 static bool pairEquals(const NKStringPair pair, const char *key,
                        const char *value) {
-    return stringEquals(pair[0], key) && stringEquals(pair[1], value);
+    return stringEquals(pair.key, key) && stringEquals(pair.value, value);
 }
 
 // ---------------------------------------------------------------------------

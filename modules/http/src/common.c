@@ -21,22 +21,22 @@ void NKBuffer_Free(NKBuffer buf) {
     return;
 }
 
-NKString NKString_Empty(void) { return (NKString){ .data = NULL, .len = 0 }; }
-int8_t NKString_IsEmpty(NKString value) { return !value.data || !value.len; }
+NKString NKString_Empty(void) { return (NKString){ .data = NULL, .length = 0 }; }
+int8_t NKString_IsEmpty(NKString value) { return !value.data || !value.length; }
 
-NKString NKString_CopyFrom(const void *str, uint64_t len) {
-    if (!len) {
+NKString NKString_CopyFrom(const void *str, uint64_t length) {
+    if (!length) {
         return NKString_Empty();
     }
 
-    uint8_t *ptr = calloc(len, sizeof(uint8_t));
+    uint8_t *ptr = calloc(length, sizeof(uint8_t));
     if (!ptr) {
         return NKString_Empty();
     }
 
-    strncpy((char *)ptr, str, len);
+    strncpy((char *)ptr, str, length);
 
-    return (NKString){ .data = ptr, .len = len };
+    return (NKString){ .data = ptr, .length = length };
 }
 
 void NKString_Free(NKString str) {

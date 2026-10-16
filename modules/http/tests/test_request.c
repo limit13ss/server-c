@@ -12,11 +12,11 @@
 
 // Heap-allocated, non-empty string (independent of NKString_CopyFrom).
 static NKString makeString(const char *str) {
-    size_t len    = strlen(str);
-    uint8_t *data = malloc(len);
+    size_t length    = strlen(str);
+    uint8_t *data = malloc(length);
     assert(data);
-    memcpy(data, str, len);
-    return (NKString){ .data = data, .len = len };
+    memcpy(data, str, length);
+    return (NKString){ .data = data, .length = length };
 }
 
 static HttpMethod methodOf(const char *str) {
@@ -26,11 +26,11 @@ static HttpMethod methodOf(const char *str) {
 static void assertStartLineIsInitial(const RequestStartLine *rsl) {
     assert(rsl->method == UNKNOWN);
     assert(rsl->targetPath.data == NULL);
-    assert(rsl->targetPath.len == 0);
+    assert(rsl->targetPath.length == 0);
     assert(rsl->params == NULL);
     assert(rsl->paramsCount == 0);
     assert(rsl->protocol.data == NULL);
-    assert(rsl->protocol.len == 0);
+    assert(rsl->protocol.length == 0);
 }
 
 static void assertRequestIsInitial(const HttpRequest *req) {

@@ -21,7 +21,10 @@ static const uint8_t DOUBLE_HTTP_SEPARATOR[] = { '\r', '\n', '\r', '\n' };
 /// ==================== STRUCTS ====================
 /// ==================== ======= ====================
 
-typedef NKString NKStringPair[2];
+typedef struct {
+    NKString key;
+    NKString value;
+} NKStringPair;
 
 typedef enum {
     GET     = 0,

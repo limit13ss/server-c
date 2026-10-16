@@ -11,7 +11,7 @@
 
 typedef struct {
     uint8_t *data;
-    uint64_t len;
+    uint64_t length;
 } NKString;
 
 typedef struct {
@@ -26,7 +26,7 @@ void NKBuffer_Free(NKBuffer buf);
 
 NKString NKString_Empty(void);
 int8_t NKString_IsEmpty(NKString value);
-NKString NKString_CopyFrom(const void *str, uint64_t len);
+NKString NKString_CopyFrom(const void *str, uint64_t length);
 
 void NKString_Free(NKString str);
 

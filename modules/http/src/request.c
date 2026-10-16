@@ -28,8 +28,8 @@ const MethodMapping METHODS_MAP[] = {
 /// ==================== ========= ====================
 
 void NKStringPair_Free(NKStringPair pair) {
-    NKString_Free(pair[0]);
-    NKString_Free(pair[1]);
+    NKString_Free(pair.key);
+    NKString_Free(pair.value);
 }
 
 RequestStartLine RequestStartLine_Init(void) {
