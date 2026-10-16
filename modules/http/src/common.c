@@ -34,10 +34,7 @@ NKString NKString_CopyFrom(const void *str, uint64_t len) {
         return NKString_Empty();
     }
 
-    if (strncpy((char *)ptr, str, len) != 0) {
-        free(ptr);
-        return NKString_Empty();
-    }
+    strncpy((char *)ptr, str, len);
 
     return (NKString){ .data = ptr, .len = len };
 }

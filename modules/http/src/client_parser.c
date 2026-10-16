@@ -88,6 +88,9 @@ HttpRequest *Parser_TryGetRequest(ParserContext *ctx) {
 /// ==================== REQUEST PARSING ====================
 /// ==================== =============== ====================
 
+bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount);
+void freeParamListElement(void *arg);
+
 int32_t findStartLine(ParserContext *ctx) {
     NKBuffer *cb = &ctx->buffer;
 
@@ -172,112 +175,6 @@ int32_t findHeaders(ParserContext *ctx) {
     ctx->state               = CompleteHeaders;
 
     return 0;
-}
-
-void freeParamListElement(void *arg) {
-    if (arg == NULL) {
-        return;
-    }
-
-    NKStringPair *pair = (NKStringPair *)arg;
-    NKStringPair_Free(*pair);
-}
-
-bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount) {
-    if (!data || !dataLen) {
-        *outParams = NULL;
-        *outParamsCount = 0;
-        return true;
-    }
-
-    LinkedList_t *paramsList = LinkedList_Create(freeParamListElement);
-    if (!paramsList) {
-        return false;
-    }
-
-    char *query = (char *)data;
-    char *token = strtok(query, "&");
-    while (token) {
-        NKString key   = NKString_Empty();
-        NKString value = NKString_Empty();
-
-        uint64_t tokenOff   = (uint64_t)token;
-        uint64_t tokenLen   = 0;
-        uint64_t eqOff      = (uint64_t)strchr(token, '=');
-        uint64_t nextAndOff = (uint64_t)strchr(token, '&');
-
-        if (nextAndOff >= tokenOff) {
-            tokenLen = nextAndOff - tokenOff;
-        } else {
-            tokenLen = dataLen - tokenOff;
-        }
-
-        if (eqOff > tokenOff) {
-            key = NKString_CopyFrom(token, eqOff - tokenOff);
-            if (eqOff < tokenLen) {
-                value = NKString_CopyFrom(token + eqOff + 1, tokenLen - eqOff);
-            } else {
-                value = NKString_Empty();
-            }
-        } else {
-            key = NKString_CopyFrom(token, tokenLen);
-        }
-
-        NKStringPair* pair = calloc(1, sizeof *pair);
-        if (!pair) {
-            NKString_Free(key);
-            NKString_Free(value);
-            goto freeListReturnFalse;
-        }
-
-        (*pair)[0] = key;
-        (*pair)[1] = value;
-
-        if (!LinkedList_AddEnd(paramsList, pair)) {
-            NKString_Free(key);
-            NKString_Free(value);
-            free(pair);
-            goto freeListReturnFalse;
-        }
-
-        token = strtok(NULL, "&");
-    }
-
-    uint64_t paramsCount = 0;
-    if (!LinkedList_Length(paramsList, &paramsCount) ||
-        paramsCount > UINT16_MAX) {
-        goto freeListReturnFalse;
-    }
-
-    *outParamsCount = (uint16_t)paramsCount;
-    *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
-    if (!(*outParams)) {
-        goto freeListReturnFalse;
-    }
-
-    uint16_t i = 0;
-    void *item;
-    while (LinkedList_PopStart(paramsList, &item)) {
-        NKStringPair *pair = item;
-        (*outParams)[i][0] = (*pair)[0];
-        (*outParams)[i][1] = (*pair)[1];
-        ++i;
-        free(pair);
-    }
-
-    LinkedList_Free(paramsList);
-    return true;
-
-freeListReturnFalse:
-    LinkedList_Free(paramsList);
-    
-    if (*outParams) {
-        free(*outParams);
-        *outParams = NULL;
-    }
-    *outParamsCount = 0;
-
-    return false;
 }
 
 int32_t parseStartLine(ParserContext *ctx) {
@@ -438,4 +335,114 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
 
 returnLabel:
     return ctx->state;
+}
+
+/// ==================== ======= ====================
+/// ==================== HELPERS ====================
+/// ==================== ======= ====================
+
+bool parseParams(const uint8_t *data, uint64_t dataLen, NKStringPair** outParams, uint16_t *outParamsCount) {
+    if (!data || !dataLen) {
+        *outParams = NULL;
+        *outParamsCount = 0;
+        return true;
+    }
+
+    LinkedList_t *paramsList = LinkedList_Create(freeParamListElement);
+    if (!paramsList) {
+        return false;
+    }
+
+    char *query = (char *)data;
+    char *token = strtok(query, "&");
+    while (token) {
+        NKString key   = NKString_Empty();
+        NKString value = NKString_Empty();
+
+        uint64_t tokenOff   = (uint64_t)token;
+        uint64_t tokenLen   = 0;
+        uint64_t eqOff      = (uint64_t)strchr(token, '=');
+        uint64_t nextAndOff = (uint64_t)strchr(token, '&');
+
+        if (nextAndOff >= tokenOff) {
+            tokenLen = nextAndOff - tokenOff;
+        } else {
+            tokenLen = dataLen - tokenOff;
+        }
+
+        if (eqOff > tokenOff) {
+            key = NKString_CopyFrom(token, eqOff - tokenOff);
+            if (eqOff < tokenLen) {
+                value = NKString_CopyFrom(token + eqOff + 1, tokenLen - eqOff);
+            } else {
+                value = NKString_Empty();
+            }
+        } else {
+            key = NKString_CopyFrom(token, tokenLen);
+        }
+
+        NKStringPair* pair = calloc(1, sizeof *pair);
+        if (!pair) {
+            NKString_Free(key);
+            NKString_Free(value);
+            goto freeListReturnFalse;
+        }
+
+        (*pair)[0] = key;
+        (*pair)[1] = value;
+
+        if (!LinkedList_AddEnd(paramsList, pair)) {
+            NKString_Free(key);
+            NKString_Free(value);
+            free(pair);
+            goto freeListReturnFalse;
+        }
+
+        token = strtok(NULL, "&");
+    }
+
+    uint64_t paramsCount = 0;
+    if (!LinkedList_Length(paramsList, &paramsCount) ||
+        paramsCount > UINT16_MAX) {
+        goto freeListReturnFalse;
+    }
+
+    *outParamsCount = (uint16_t)paramsCount;
+    *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
+    if (!(*outParams)) {
+        goto freeListReturnFalse;
+    }
+
+    uint16_t i = 0;
+    void *item;
+    while (LinkedList_PopStart(paramsList, &item)) {
+        NKStringPair *pair = item;
+        (*outParams)[i][0] = (*pair)[0];
+        (*outParams)[i][1] = (*pair)[1];
+        ++i;
+        free(pair);
+    }
+
+    LinkedList_Free(paramsList);
+    return true;
+
+freeListReturnFalse:
+    LinkedList_Free(paramsList);
+    
+    if (*outParams) {
+        free(*outParams);
+        *outParams = NULL;
+    }
+    *outParamsCount = 0;
+
+    return false;
+}
+
+void freeParamListElement(void *arg) {
+    if (arg == NULL) {
+        return;
+    }
+
+    NKStringPair *pair = (NKStringPair *)arg;
+    NKStringPair_Free(*pair);
 }
