@@ -36,8 +36,6 @@ int32_t parseHeaders(ParserContext *ctx);
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Context with `data` in its buffer, as Parser_TryParseRequest leaves it
-// right before calling findStartLine.
 static ParserContext *contextWith(const char *data) {
     ParserContext *ctx = ParserContext_Init();
     assert(ctx);
@@ -51,8 +49,6 @@ static ParserContext *contextWith(const char *data) {
     return ctx;
 }
 
-// Context as findStartLine is expected to leave it: the start line is
-// [0, first "\r\n" - 1] and headers start right after that "\r\n".
 static ParserContext *contextAfterStartLine(const char *data) {
     ParserContext *ctx = contextWith(data);
 
@@ -67,8 +63,6 @@ static ParserContext *contextAfterStartLine(const char *data) {
     return ctx;
 }
 
-// Context as findHeaders is expected to leave it once all headers are read:
-// headers end right before the first "\r\n\r\n".
 static ParserContext *contextAfterHeaders(const char *data) {
     ParserContext *ctx = contextAfterStartLine(data);
 
@@ -293,15 +287,15 @@ void testFindHeaders_DataArrivesInChunks(void) {
     ParserContext *ctx =
         contextAfterStartLine("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-    ctx->buffer.length = 27; // "...\r\nHost: local"
+    ctx->buffer.length = 17; // "...\r\nH"
     assert(findHeaders(ctx) == 0);
     assert(ctx->state == AwaitingHeaders);
 
-    ctx->buffer.length = 33; // "...\r\nHost: localhost\r\n"
+    ctx->buffer.length = 20; // "...\r\nHost"
     assert(findHeaders(ctx) == 0);
     assert(ctx->state == AwaitingHeaders);
 
-    ctx->buffer.length = 34; // "...\r\nHost: localhost\r\n\r"
+    ctx->buffer.length = 25; // "...\r\nHost: loc"
     assert(findHeaders(ctx) == 0);
     assert(ctx->state == AwaitingHeaders);
 

@@ -95,8 +95,21 @@ int32_t findStartLine(ParserContext *ctx) {
         return -1;
     }
 
-    void *sepPtr =
-        memmem(cb->values, cb->length, HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
+    uint64_t slStart = ctx->startLineRange.startPos;
+    while (slStart < cb->length && cb->values[slStart] <= (uint8_t)(' ')) {
+        ++slStart;
+    }
+
+    if (slStart >= cb->length) {
+        ctx->state = AwaitingStartLine;
+        ctx->startLineRange.startPos = slStart;
+        return 0;
+    }
+
+    void *sepPtr = memmem(
+        cb->values + slStart,
+        cb->length - slStart,
+        HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
 
     if (!sepPtr) {
         return -1;
@@ -121,8 +134,9 @@ int32_t findHeaders(ParserContext *ctx) {
         return -1;
     }
 
-    void *sepPtr = memmem(cb->values + ctx->headersRange.startPos, cb->length,
-                          DOUBLE_HTTP_SEPARATOR, DOUBLE_HTTP_SEPARATOR_LEN);
+    void *sepPtr = memmem(cb->values + ctx->headersRange.startPos,
+        cb->length - ctx->headersRange.startPos,
+        DOUBLE_HTTP_SEPARATOR, DOUBLE_HTTP_SEPARATOR_LEN);
 
     if (!sepPtr) {
         if (cb->length >= cb->capacity) {
@@ -130,8 +144,9 @@ int32_t findHeaders(ParserContext *ctx) {
             return -1;
         }
 
-        sepPtr = memmem(cb->values + ctx->headersRange.startPos, cb->length,
-                        HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
+        sepPtr = memmem(cb->values + ctx->headersRange.startPos,
+            cb->length - ctx->headersRange.startPos,
+            HTTP_SEPARATOR, HTTP_SEPARATOR_LEN);
 
         // case: request without headers at all
         // "GET /path HTTP/1.0\r\n\r\n"
