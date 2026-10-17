@@ -357,7 +357,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
     }
 
     uint16_t left = 0;
-    uint16_t right = 0;
+    uint16_t right = 1;
     uint16_t tokenLength = 0;
     char *token = NULL;
 
@@ -401,6 +401,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
         ++(*outParamsCount);
 
         left = right;
+        right = left + 1;
     } while (left < str.length);
 
     *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
