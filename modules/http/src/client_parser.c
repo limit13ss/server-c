@@ -352,7 +352,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
     }
 
     LinkedList_t *paramsList = LinkedList_Create(freeParamListElement);
-    if (!paramsList) {
+    if (paramsList == NULL) {
         return false;
     }
 
@@ -373,7 +373,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
         }
 
         NKStringPair* pair = calloc(1, sizeof *pair);
-        if (!pair) {
+        if (pair == NULL) {
             goto freeListReturnFalse;
         }
 
@@ -381,9 +381,10 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
         pair->value = NKString_Empty();
 
         char *ptr = memchr(token, '=', tokenLength);
-        if (ptr) {
+        if (ptr != NULL) {
             uint16_t eqOffset = (uint16_t)(ptr - token);
             if (eqOffset == 0) {
+                free(pair);
                 continue;
             }
 
@@ -393,7 +394,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
             }
         }
 
-        if (LinkedList_AddEnd(paramsList, pair)) {
+        if (LinkedList_AddEnd(paramsList, pair) != 0) {
             free(pair);
             goto freeListReturnFalse;
         }
@@ -405,7 +406,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
     } while (left < str.length);
 
     *outParams = calloc(*outParamsCount, sizeof(NKStringPair));
-    if (!(*outParams)) {
+    if (*outParams == NULL) {
         goto freeListReturnFalse;
     }
 
@@ -423,7 +424,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
 freeListReturnFalse:
     LinkedList_Free(paramsList);
     
-    if (*outParams) {
+    if (*outParams != NULL) {
         free(*outParams);
         *outParams = NULL;
     }
@@ -432,11 +433,11 @@ freeListReturnFalse:
     return false;
 }
 
-void freeParamListElement(void *arg) {
-    if (arg == NULL) {
+void freeParamListElement(void *item) {
+    if (item == NULL) {
         return;
     }
 
-    NKStringPair *pair = (NKStringPair *)arg;
-    NKStringPair_Free(*pair);
+    NKStringPair_Free(*((NKStringPair *)item));
+    free(item);
 }
