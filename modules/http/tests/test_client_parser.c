@@ -517,9 +517,7 @@ void testParseStartLine_QueryStaysInsideStartLine(void) {
 
 // ---------------------------------------------------------------------------
 // parseHeaders
-// NOTE: parseHeaders is still a TODO. Apart from testParseHeaders_NoRequest
-// these tests describe the expected behavior (RFC 9112, section 5) and fail
-// until it is implemented.
+// NOTE: expected behavior is documented in RFC 9112, section 5
 // ---------------------------------------------------------------------------
 
 static void assertParseHeadersFails(const char *data) {

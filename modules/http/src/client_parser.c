@@ -392,6 +392,8 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
             if (eqOffset < tokenLength - 1) {
                 pair->value = NKString_CopyFrom(token + eqOffset + 1, (uint64_t)(tokenLength - 1 - eqOffset));
             }
+        } else {
+            pair->key = NKString_CopyFrom(token, tokenLength);
         }
 
         if (LinkedList_AddEnd(paramsList, pair) != 0) {
@@ -401,7 +403,7 @@ bool parseParams(NKString str, NKStringPair** outParams, uint16_t *outParamsCoun
 
         ++(*outParamsCount);
 
-        left = right;
+        left = right + 1;
         right = left + 1;
     } while (left < str.length);
 
