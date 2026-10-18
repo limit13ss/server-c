@@ -44,6 +44,7 @@ void freeContext(const int32_t fd) {
     }
 
     ParserContext_Free(g_parserContexts[fd]);
+    free(g_parserContexts[fd]);
     g_parserContexts[fd] = NULL;
 }
 

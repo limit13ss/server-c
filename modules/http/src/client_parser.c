@@ -41,7 +41,7 @@ NKBuffer initNKBuffer(void) {
 
 ParserContext *ParserContext_Init(void) {
     ParserContext *ctx = calloc(1, sizeof(ParserContext));
-    if (!ctx) {
+    if (ctx == NULL) {
         return NULL;
     }
 
@@ -56,13 +56,18 @@ ParserContext *ParserContext_Init(void) {
 }
 
 void ParserContext_Free(ParserContext *ctx) {
-    if (!ctx) {
+    if (ctx == NULL) {
         return;
     }
 
-    NKBuffer_Free(ctx->buffer);
+    if (ctx->request != NULL) {
+        HttpRequest_Free(ctx->request);
+        free(ctx->request);
+        ctx->request = NULL;
+    }
 
-    free(ctx);
+    NKBuffer_Free(ctx->buffer);
+    ctx->buffer = NKBUffer_Empty();
 }
 
 NKBuffer *ParserContext_GetBuffer(ParserContext *ctx) {
@@ -303,8 +308,8 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
         }
 
         case CompleteHeaders: {
-            ctx->request = calloc(1, sizeof *(ctx->request));
-            if (!ctx->request) {
+            ctx->request = malloc(sizeof *ctx->request);
+            if (ctx->request == NULL) {
                 ctx->state = InternalError;
                 break;
             }
@@ -319,6 +324,7 @@ RequestParsingState Parser_TryParseRequest(ParserContext *ctx) {
             }
             break;
         }
+
         case AwaitingBody: {
             // TODO: implement
             break;

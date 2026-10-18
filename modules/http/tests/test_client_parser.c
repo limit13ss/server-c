@@ -91,15 +91,6 @@ static ParserContext *contextForParsing(const char *data) {
     return ctx;
 }
 
-static void freeContext(ParserContext *ctx) {
-    if (ctx->request) {
-        HttpRequest_Free(ctx->request);
-        free(ctx->request);
-        ctx->request = NULL;
-    }
-    ParserContext_Free(ctx);
-}
-
 static bool stringEquals(NKString str, const char *expected) {
     size_t len = strlen(expected);
     if (str.length != len) {
@@ -123,7 +114,7 @@ void testFindStartLine_EmptyBuffer(void) {
     assert(findStartLine(ctx) == -1);
     assert(ctx->state == AwaitingStartLine);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindStartLine_NoSeparator(void) {
@@ -132,7 +123,7 @@ void testFindStartLine_NoSeparator(void) {
     assert(findStartLine(ctx) == -1);
     assert(ctx->state == AwaitingStartLine);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindStartLine_StartLineOnly(void) {
@@ -144,7 +135,7 @@ void testFindStartLine_StartLineOnly(void) {
     assert(ctx->startLineRange.endPos == 23);
     assert(ctx->headersRange.startPos == 26);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindStartLine_StopsAtFirstSeparator(void) {
@@ -156,7 +147,7 @@ void testFindStartLine_StopsAtFirstSeparator(void) {
     assert(ctx->startLineRange.endPos == 13);
     assert(ctx->headersRange.startPos == 16);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindStartLine_DataArrivesInChunks(void) {
@@ -177,7 +168,7 @@ void testFindStartLine_DataArrivesInChunks(void) {
     assert(ctx->startLineRange.endPos == 13);
     assert(ctx->headersRange.startPos == 16);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindStartLine_LeadingEmptyLine_RangesStayInBuffer(void) {
@@ -188,7 +179,7 @@ void testFindStartLine_LeadingEmptyLine_RangesStayInBuffer(void) {
         assert(ctx->headersRange.startPos <= ctx->buffer.length);
     }
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +192,7 @@ void testFindHeaders_EmptyBuffer(void) {
 
     assert(findHeaders(ctx) == -1);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_StartLineNotFound(void) {
@@ -211,7 +202,7 @@ void testFindHeaders_StartLineNotFound(void) {
     assert(findHeaders(ctx) == -1);
     assert(ctx->state == BadRequestError);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_HeadersStartNotSet(void) {
@@ -222,7 +213,7 @@ void testFindHeaders_HeadersStartNotSet(void) {
     assert(findHeaders(ctx) == -1);
     assert(ctx->state == BadRequestError);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_NothingAfterStartLine(void) {
@@ -231,7 +222,7 @@ void testFindHeaders_NothingAfterStartLine(void) {
     assert(findHeaders(ctx) == 0);
     assert(ctx->state == AwaitingHeaders);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_NoHeaders(void) {
@@ -242,7 +233,7 @@ void testFindHeaders_NoHeaders(void) {
     assert(ctx->headersRange.startPos == 0);
     assert(ctx->headersRange.endPos == 0);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_SingleHeader(void) {
@@ -254,7 +245,7 @@ void testFindHeaders_SingleHeader(void) {
     assert(ctx->headersRange.startPos == 16);
     assert(ctx->headersRange.endPos == 30);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_MultipleHeaders(void) {
@@ -266,7 +257,7 @@ void testFindHeaders_MultipleHeaders(void) {
     assert(ctx->headersRange.startPos == 16);
     assert(ctx->headersRange.endPos == 43);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_StopsAtFirstEmptyLine(void) {
@@ -279,7 +270,7 @@ void testFindHeaders_StopsAtFirstEmptyLine(void) {
     assert(ctx->headersRange.startPos == 17);
     assert(ctx->headersRange.endPos == 33);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_DataArrivesInChunks(void) {
@@ -305,7 +296,7 @@ void testFindHeaders_DataArrivesInChunks(void) {
     assert(ctx->headersRange.startPos == 16);
     assert(ctx->headersRange.endPos == 30);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_BufferFull(void) {
@@ -317,7 +308,7 @@ void testFindHeaders_BufferFull(void) {
     assert(findHeaders(ctx) == -1);
     assert(ctx->state == LongHeadersError);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testFindHeaders_BufferFullWithCompleteHeaders(void) {
@@ -332,7 +323,7 @@ void testFindHeaders_BufferFullWithCompleteHeaders(void) {
     assert(ctx->headersRange.startPos == 16);
     assert(ctx->headersRange.endPos == buf->capacity - 5);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +333,7 @@ void testFindHeaders_BufferFullWithCompleteHeaders(void) {
 static void assertParseStartLineFails(const char *data) {
     ParserContext *ctx = contextForParsing(data);
     assert(parseStartLine(ctx) == -1);
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_NoRequest(void) {
@@ -351,7 +342,7 @@ void testParseStartLine_NoRequest(void) {
 
     assert(parseStartLine(ctx) == -1);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_EmptyRange(void) {
@@ -360,7 +351,7 @@ void testParseStartLine_EmptyRange(void) {
 
     assert(parseStartLine(ctx) == -1);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_Simple(void) {
@@ -375,7 +366,7 @@ void testParseStartLine_Simple(void) {
     assert(line->paramsCount == 0);
     assert(stringEquals(line->protocol, "HTTP/1.0"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_WithHeaders(void) {
@@ -392,7 +383,7 @@ void testParseStartLine_WithHeaders(void) {
     assert(line->paramsCount == 0);
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_AllMethods(void) {
@@ -413,7 +404,7 @@ void testParseStartLine_AllMethods(void) {
         assert(parseStartLine(ctx) == 0);
         assert(ctx->request->startLine.method == methods[i].value);
 
-        freeContext(ctx);
+        ParserContext_Free(ctx);
     }
 }
 
@@ -444,7 +435,7 @@ void testParseStartLine_SingleParam(void) {
     assert(pairEquals(line->params[0], "q", "http"));
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_MultipleParams(void) {
@@ -463,7 +454,7 @@ void testParseStartLine_MultipleParams(void) {
     assert(pairEquals(line->params[2], "page", "2"));
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_ParamsWithoutValue(void) {
@@ -481,7 +472,7 @@ void testParseStartLine_ParamsWithoutValue(void) {
     assert(pairEquals(line->params[2], "page", "2"));
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_EmptyQuery(void) {
@@ -495,7 +486,7 @@ void testParseStartLine_EmptyQuery(void) {
     assert(line->paramsCount == 0);
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseStartLine_QueryStaysInsideStartLine(void) {
@@ -512,7 +503,7 @@ void testParseStartLine_QueryStaysInsideStartLine(void) {
     assert(pairEquals(line->params[0], "a", "1"));
     assert(stringEquals(line->protocol, "HTTP/1.1"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +514,7 @@ void testParseStartLine_QueryStaysInsideStartLine(void) {
 static void assertParseHeadersFails(const char *data) {
     ParserContext *ctx = contextForParsing(data);
     assert(parseHeaders(ctx) == -1);
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_NoRequest(void) {
@@ -534,7 +525,7 @@ void testParseHeaders_NoRequest(void) {
     assert(parseHeaders(ctx) == -1);
     assert(ctx->state == BadRequestError);
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_SingleHeader(void) {
@@ -546,7 +537,7 @@ void testParseHeaders_SingleHeader(void) {
     assert(ctx->request->headers);
     assert(pairEquals(ctx->request->headers[0], "Host", "localhost"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_MultipleHeaders_KeepOrder(void) {
@@ -561,7 +552,7 @@ void testParseHeaders_MultipleHeaders_KeepOrder(void) {
     assert(pairEquals(ctx->request->headers[1], "Accept", "*/*"));
     assert(pairEquals(ctx->request->headers[2], "Connection", "close"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_ValueWhitespaceTrimmed(void) {
@@ -574,7 +565,7 @@ void testParseHeaders_ValueWhitespaceTrimmed(void) {
     assert(pairEquals(ctx->request->headers[0], "Host", "localhost"));
     assert(pairEquals(ctx->request->headers[1], "X-Padded", "value"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_ValueContainsColon(void) {
@@ -586,7 +577,7 @@ void testParseHeaders_ValueContainsColon(void) {
     assert(ctx->request->headers);
     assert(pairEquals(ctx->request->headers[0], "Host", "localhost:8080"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_EmptyValue(void) {
@@ -599,7 +590,7 @@ void testParseHeaders_EmptyValue(void) {
     assert(pairEquals(ctx->request->headers[0], "X-Empty", ""));
     assert(pairEquals(ctx->request->headers[1], "Host", "localhost"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_IgnoresBody(void) {
@@ -611,7 +602,7 @@ void testParseHeaders_IgnoresBody(void) {
     assert(ctx->request->headers);
     assert(pairEquals(ctx->request->headers[0], "Content-Length", "12"));
 
-    freeContext(ctx);
+    ParserContext_Free(ctx);
 }
 
 void testParseHeaders_MissingColon(void) {

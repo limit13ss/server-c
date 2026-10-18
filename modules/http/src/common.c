@@ -7,14 +7,15 @@ NKBuffer NKBuffer_Empty(void) {
     return (NKBuffer){ .values = NULL, .capacity = 0, .length = 0 };
 }
 int8_t NKBuffer_IsValidAndEmpty(NKBuffer buf) {
-    return buf.values && !buf.length;
+    return buf.values != NULL && buf.length == 0;
 }
 
 void NKBuffer_Free(NKBuffer buf) {
-    if (!buf.values) {
-        return;
+    if (buf.values != NULL) {
+        free(buf.values);
     }
-    free(buf.values);
+
+    buf.values   = NULL;
     buf.capacity = 0;
     buf.length   = 0;
 
@@ -43,4 +44,6 @@ void NKString_Free(NKString str) {
     if (str.data) {
         free(str.data);
     }
+    str.data   = NULL;
+    str.length = 0;
 }
